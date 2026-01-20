@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voxel Snow Plow - Clear the Snow!</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="ui-overlay">
+            <div id="hud">
+                <div class="hud-item">
+                    <span class="label">Snow Cleared:</span>
+                    <span id="score">0</span>
+                    <span class="unit">blocks</span>
+                </div>
+                <div class="hud-item">
+                    <span class="label">Speed:</span>
+                    <span id="speed">0</span>
+                    <span class="unit">mph</span>
+                </div>
+                <div class="hud-item">
+                    <span class="label">Progress:</span>
+                    <span id="progress">0</span>
+                    <span class="unit">%</span>
+                </div>
+            </div>
+
+            <div id="controls-info">
+                <h3>🎮 Controls</h3>
+                <p><strong>W/↑</strong> - Accelerate</p>
+                <p><strong>S/↓</strong> - Brake/Reverse</p>
+                <p><strong>A/←</strong> - Turn Left</p>
+                <p><strong>D/→</strong> - Turn Right</p>
+                <p><strong>Space</strong> - Handbrake</p>
+                <p><strong>R</strong> - Reset Position</p>
+            </div>
+
+            <div id="start-screen" class="modal">
+                <div class="modal-content">
+                    <h1>❄️ Voxel Snow Plow ❄️</h1>
+                    <p>Clear all the snow from the streets!</p>
+                    <button id="start-btn" class="game-btn">Start Plowing!</button>
+                </div>
+            </div>
+
+            <div id="complete-screen" class="modal hidden">
+                <div class="modal-content">
+                    <h1>🎉 Area Cleared! 🎉</h1>
+                    <p>You've plowed all the snow!</p>
+                    <p id="final-score"></p>
+                    <button id="restart-btn" class="game-btn">Plow Again!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
