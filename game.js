@@ -19,10 +19,10 @@ class VoxelSnowPlowGame {
         this.plowVelocity = new THREE.Vector3(0, 0, 0);
         this.plowRotation = 0;
         this.plowRotationVelocity = 0;
-        this.acceleration = 0.15;
-        this.maxSpeed = 0.8;
-        this.friction = 0.92;
-        this.turnSpeed = 0.04;
+        this.acceleration = 0.05;
+        this.maxSpeed = 0.35;
+        this.friction = 0.96;
+        this.turnSpeed = 0.02;
         this.bounciness = 0.6;
 
         // Controls
