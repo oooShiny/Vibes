@@ -22,7 +22,8 @@ class VoxelSnowPlowGame {
         this.acceleration = 0.05;
         this.maxSpeed = 0.35;
         this.friction = 0.96;
-        this.turnSpeed = 0.02;
+        this.turnSpeed = 0.008;
+        this.turnFriction = 0.85;
         this.bounciness = 0.6;
 
         // Controls
@@ -270,7 +271,7 @@ class VoxelSnowPlowGame {
 
         // Turning (only when moving)
         const speed = this.plowVelocity.length();
-        if (speed > 0.05) {
+        if (speed > 0.08) {
             if (this.keys['a'] || this.keys['arrowleft']) {
                 this.plowRotationVelocity += this.turnSpeed;
             }
@@ -291,7 +292,7 @@ class VoxelSnowPlowGame {
 
         // Apply friction
         this.plowVelocity.multiplyScalar(this.friction);
-        this.plowRotationVelocity *= 0.88;
+        this.plowRotationVelocity *= this.turnFriction;
 
         // Update rotation
         this.plowRotation += this.plowRotationVelocity;
