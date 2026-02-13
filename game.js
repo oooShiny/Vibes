@@ -15,16 +15,47 @@ class VoxelSnowPlowGame {
         this.score = 0;
         this.totalSnowBlocks = 0;
 
-        // Physics properties (cartoon style - exaggerated)
-        this.plowVelocity = new THREE.Vector3(0, 0, 0);
+        // Enhanced physics properties
+        this.forwardVelocity = 0;
+        this.lateralVelocity = 0;
         this.plowRotation = 0;
         this.plowRotationVelocity = 0;
-        this.acceleration = 0.05;
-        this.maxSpeed = 0.35;
-        this.friction = 0.96;
-        this.turnSpeed = 0.008;
-        this.turnFriction = 0.85;
-        this.bounciness = 0.6;
+
+        // Acceleration with curve
+        this.acceleration = 0.008;
+        this.maxSpeed = 0.5;
+        this.reverseSpeed = 0.25;
+
+        // Friction and drag
+        this.forwardFriction = 0.98;
+        this.lateralFriction = 0.85;  // Higher lateral friction for realistic handling
+        this.rotationDamping = 0.90;
+
+        // Turning dynamics
+        this.baseTurnSpeed = 0.012;
+        this.speedTurnFactor = 0.6;  // Turning gets harder at high speed
+
+        // Drift and slide
+        this.driftThreshold = 0.15;
+        this.isDrifting = false;
+
+        // Visual feedback
+        this.bodyTilt = 0;
+        this.tiltSpeed = 0.15;
+        this.tiltDamping = 0.85;
+
+        // Camera properties
+        this.cameraDistance = 18;
+        this.cameraHeight = 10;
+        this.cameraLookAhead = 3;
+        this.cameraSmoothing = 0.08;
+        this.cameraTargetPos = new THREE.Vector3();
+        this.cameraTargetLook = new THREE.Vector3();
+
+        // Particle systems
+        this.particles = [];
+        this.tireTrackMarks = [];
+        this.maxTireMarks = 100;
 
         // Controls
         this.keys = {};
@@ -32,6 +63,9 @@ class VoxelSnowPlowGame {
         // Grid settings
         this.gridSize = 40;
         this.voxelSize = 1;
+
+        // Wall bounce
+        this.bounciness = 0.6;
 
         this.init();
     }
@@ -51,6 +85,10 @@ class VoxelSnowPlowGame {
         );
         this.camera.position.set(0, 20, 20);
         this.camera.lookAt(0, 0, 0);
+
+        // Initialize camera targets
+        this.cameraTargetPos.copy(this.camera.position);
+        this.cameraTargetLook.set(0, 0, 0);
 
         // Create renderer
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -181,20 +219,25 @@ class VoxelSnowPlowGame {
         // Create a voxel-style snow plow
         this.snowPlow = new THREE.Group();
 
+        // Create body container for tilt animation
+        this.snowPlowBody = new THREE.Group();
+        this.snowPlow.add(this.snowPlowBody);
+
         // Main body (orange)
         const body = this.createVoxel(0, 1, 0, 0xFF6600, 2);
-        this.snowPlow.add(body);
+        this.snowPlowBody.add(body);
 
         // Cabin (yellow)
         const cabin = this.createVoxel(0, 2.5, -0.3, 0xFFDD00, 1.5);
-        this.snowPlow.add(cabin);
+        this.snowPlowBody.add(cabin);
 
         // Plow blade (silver) - front
         const blade = this.createVoxel(0, 0.8, 1.5, 0xC0C0C0, 2.5);
         blade.scale.z = 0.3;
-        this.snowPlow.add(blade);
+        this.snowPlowBody.add(blade);
 
-        // Wheels (black)
+        // Wheels (black) - store for animation
+        this.wheels = [];
         const wheelPositions = [
             [-0.8, 0.3, 0.8],
             [0.8, 0.3, 0.8],
@@ -204,14 +247,15 @@ class VoxelSnowPlowGame {
 
         wheelPositions.forEach(pos => {
             const wheel = this.createVoxel(pos[0], pos[1], pos[2], 0x222222, 0.6);
-            this.snowPlow.add(wheel);
+            this.snowPlow.add(wheel);  // Wheels don't tilt
+            this.wheels.push(wheel);
         });
 
         // Lights (bright yellow)
         const leftLight = this.createVoxel(-0.6, 1.5, 1.3, 0xFFFF00, 0.4);
         const rightLight = this.createVoxel(0.6, 1.5, 1.3, 0xFFFF00, 0.4);
-        this.snowPlow.add(leftLight);
-        this.snowPlow.add(rightLight);
+        this.snowPlowBody.add(leftLight);
+        this.snowPlowBody.add(rightLight);
 
         // Set initial position
         this.snowPlow.position.set(0, 0, 0);
@@ -250,71 +294,205 @@ class VoxelSnowPlowGame {
     updateControls() {
         if (!this.gameStarted) return;
 
-        // Forward/Backward
+        // Acceleration input (non-linear for better feel)
         if (this.keys['w'] || this.keys['arrowup']) {
-            const forward = new THREE.Vector3(
-                Math.sin(this.plowRotation),
-                0,
-                Math.cos(this.plowRotation)
-            ).multiplyScalar(this.acceleration);
-            this.plowVelocity.add(forward);
+            // Acceleration curve - easier to start, harder to reach max speed
+            const speedRatio = Math.abs(this.forwardVelocity) / this.maxSpeed;
+            const accelMultiplier = 1.0 - (speedRatio * 0.5);
+            this.forwardVelocity += this.acceleration * accelMultiplier;
         }
 
         if (this.keys['s'] || this.keys['arrowdown']) {
-            const backward = new THREE.Vector3(
-                Math.sin(this.plowRotation),
-                0,
-                Math.cos(this.plowRotation)
-            ).multiplyScalar(-this.acceleration * 0.6);
-            this.plowVelocity.add(backward);
+            // Braking or reverse
+            if (this.forwardVelocity > 0.01) {
+                // Braking (faster than friction)
+                this.forwardVelocity -= this.acceleration * 1.5;
+            } else {
+                // Reverse (slower than forward)
+                this.forwardVelocity -= this.acceleration * 0.7;
+            }
         }
 
-        // Turning (only when moving)
-        const speed = this.plowVelocity.length();
-        if (speed > 0.08) {
+        // Speed limits
+        this.forwardVelocity = Math.max(-this.reverseSpeed, Math.min(this.maxSpeed, this.forwardVelocity));
+
+        // Speed-based turning
+        const speed = Math.abs(this.forwardVelocity);
+        const canTurn = speed > 0.02;
+
+        if (canTurn) {
+            // Turn speed decreases at high speeds (more realistic)
+            const speedFactor = 1.0 - (speed / this.maxSpeed) * this.speedTurnFactor;
+            const effectiveTurnSpeed = this.baseTurnSpeed * speedFactor;
+
+            // Turning direction depends on forward/reverse
+            const turnDirection = this.forwardVelocity >= 0 ? 1 : -1;
+
             if (this.keys['a'] || this.keys['arrowleft']) {
-                this.plowRotationVelocity += this.turnSpeed;
+                this.plowRotationVelocity += effectiveTurnSpeed * turnDirection;
             }
             if (this.keys['d'] || this.keys['arrowright']) {
-                this.plowRotationVelocity -= this.turnSpeed;
+                this.plowRotationVelocity -= effectiveTurnSpeed * turnDirection;
             }
         }
 
-        // Handbrake
+        // Handbrake - creates drift
         if (this.keys[' ']) {
-            this.plowVelocity.multiplyScalar(0.85);
+            this.forwardVelocity *= 0.96;
+            this.lateralVelocity *= 0.90;  // Less lateral friction when drifting
+            this.isDrifting = true;
+        } else {
+            this.isDrifting = false;
         }
 
-        // Apply speed limit
-        if (this.plowVelocity.length() > this.maxSpeed) {
-            this.plowVelocity.normalize().multiplyScalar(this.maxSpeed);
-        }
-
-        // Apply friction
-        this.plowVelocity.multiplyScalar(this.friction);
-        this.plowRotationVelocity *= this.turnFriction;
+        // Apply rotation damping
+        this.plowRotationVelocity *= this.rotationDamping;
 
         // Update rotation
         this.plowRotation += this.plowRotationVelocity;
         this.snowPlow.rotation.y = -this.plowRotation;
 
-        // Update position
-        this.snowPlow.position.add(this.plowVelocity);
+        // Calculate velocity in world space using forward/lateral components
+        const forwardX = Math.sin(this.plowRotation) * this.forwardVelocity;
+        const forwardZ = Math.cos(this.plowRotation) * this.forwardVelocity;
 
-        // Boundary collision with bounce (cartoon physics)
+        const lateralX = Math.cos(this.plowRotation) * this.lateralVelocity;
+        const lateralZ = -Math.sin(this.plowRotation) * this.lateralVelocity;
+
+        // Update position
+        this.snowPlow.position.x += forwardX + lateralX;
+        this.snowPlow.position.z += forwardZ + lateralZ;
+
+        // Apply friction
+        this.forwardVelocity *= this.forwardFriction;
+        this.lateralVelocity *= this.lateralFriction;
+
+        // Drift detection and lateral velocity from turning
+        if (Math.abs(this.plowRotationVelocity) > this.driftThreshold && speed > 0.15) {
+            this.lateralVelocity += this.plowRotationVelocity * speed * 2;
+            this.isDrifting = true;
+        }
+
+        // Update body tilt based on turning
+        const targetTilt = -this.plowRotationVelocity * 8;
+        this.bodyTilt += (targetTilt - this.bodyTilt) * this.tiltSpeed;
+        this.bodyTilt *= this.tiltDamping;
+        this.snowPlowBody.rotation.z = this.bodyTilt;
+
+        // Animate wheels
+        this.animateWheels();
+
+        // Leave tire tracks
+        if (speed > 0.05 && this.gameStarted) {
+            this.createTireTracks();
+        }
+
+        // Spawn particles when drifting
+        if (this.isDrifting && speed > 0.2) {
+            this.createDriftParticles();
+        }
+
+        // Boundary collision
+        this.handleBoundaryCollision();
+    }
+
+    animateWheels() {
+        const rotationSpeed = this.forwardVelocity * 3;
+        this.wheels.forEach(wheel => {
+            wheel.rotation.x += rotationSpeed;
+        });
+    }
+
+    createTireTracks() {
+        // Create simple tire track markers every few frames
+        if (Math.random() > 0.7) {
+            const trackGeometry = new THREE.PlaneGeometry(0.3, 0.6);
+            const trackMaterial = new THREE.MeshBasicMaterial({
+                color: 0x444444,
+                transparent: true,
+                opacity: 0.3
+            });
+            const track = new THREE.Mesh(trackGeometry, trackMaterial);
+            track.rotation.x = -Math.PI / 2;
+            track.rotation.z = -this.plowRotation;
+            track.position.set(
+                this.snowPlow.position.x,
+                0.01,
+                this.snowPlow.position.z
+            );
+
+            this.scene.add(track);
+            this.tireTrackMarks.push(track);
+
+            // Remove old tracks
+            if (this.tireTrackMarks.length > this.maxTireMarks) {
+                const oldTrack = this.tireTrackMarks.shift();
+                this.scene.remove(oldTrack);
+            }
+        }
+    }
+
+    createDriftParticles() {
+        // Create snow dust particles when drifting
+        if (Math.random() > 0.5) {
+            const particleGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+            const particleMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFFFFFF,
+                transparent: true,
+                opacity: 0.8
+            });
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+
+            // Spawn behind the vehicle
+            const offset = 2;
+            particle.position.set(
+                this.snowPlow.position.x - Math.sin(this.plowRotation) * offset,
+                0.3,
+                this.snowPlow.position.z - Math.cos(this.plowRotation) * offset
+            );
+
+            particle.velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.1,
+                Math.random() * 0.05,
+                (Math.random() - 0.5) * 0.1
+            );
+            particle.life = 1.0;
+
+            this.scene.add(particle);
+            this.particles.push(particle);
+        }
+
+        // Update and remove old particles
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const particle = this.particles[i];
+            particle.position.add(particle.velocity);
+            particle.velocity.y -= 0.002;  // Gravity
+            particle.life -= 0.02;
+            particle.material.opacity = particle.life * 0.8;
+
+            if (particle.life <= 0) {
+                this.scene.remove(particle);
+                this.particles.splice(i, 1);
+            }
+        }
+    }
+
+    handleBoundaryCollision() {
         const maxBound = this.gridSize / 2 - 3;
 
         if (Math.abs(this.snowPlow.position.x) > maxBound) {
             this.snowPlow.position.x = Math.sign(this.snowPlow.position.x) * maxBound;
-            this.plowVelocity.x *= -this.bounciness;
-            this.plowVelocity.z *= 0.7;
+            this.forwardVelocity *= -this.bounciness;
+            this.lateralVelocity *= -this.bounciness;
+            this.plowRotationVelocity *= -0.5;
             this.createBounceEffect(this.snowPlow.position);
         }
 
         if (Math.abs(this.snowPlow.position.z) > maxBound) {
             this.snowPlow.position.z = Math.sign(this.snowPlow.position.z) * maxBound;
-            this.plowVelocity.z *= -this.bounciness;
-            this.plowVelocity.x *= 0.7;
+            this.forwardVelocity *= -this.bounciness;
+            this.lateralVelocity *= -this.bounciness;
+            this.plowRotationVelocity *= -0.5;
             this.createBounceEffect(this.snowPlow.position);
         }
     }
@@ -338,6 +516,7 @@ class VoxelSnowPlowGame {
     checkSnowCollision() {
         const plowPos = this.snowPlow.position;
         const plowRadius = 2;
+        const speed = Math.abs(this.forwardVelocity);
 
         for (let i = this.snowBlocks.length - 1; i >= 0; i--) {
             const snowBlock = this.snowBlocks[i];
@@ -348,10 +527,42 @@ class VoxelSnowPlowGame {
                 Math.pow(plowPos.z - snowPos.z, 2)
             );
 
-            if (distance < plowRadius && this.plowVelocity.length() > 0.1) {
+            if (distance < plowRadius && speed > 0.08) {
                 // Remove snow with animation
                 this.removeSnowBlock(snowBlock, i);
+
+                // Create extra particles when hitting snow
+                this.createSnowHitParticles(snowPos);
             }
+        }
+    }
+
+    createSnowHitParticles(position) {
+        // Burst of particles when snow is hit
+        for (let i = 0; i < 5; i++) {
+            const particleGeometry = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+            const particleMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFFFFFF,
+                transparent: true,
+                opacity: 1.0
+            });
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+
+            particle.position.set(
+                position.x + (Math.random() - 0.5) * 0.5,
+                position.y + Math.random() * 0.5,
+                position.z + (Math.random() - 0.5) * 0.5
+            );
+
+            particle.velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.15,
+                Math.random() * 0.1 + 0.05,
+                (Math.random() - 0.5) * 0.15
+            );
+            particle.life = 1.0;
+
+            this.scene.add(particle);
+            this.particles.push(particle);
         }
     }
 
@@ -393,7 +604,7 @@ class VoxelSnowPlowGame {
     updateUI() {
         document.getElementById('score').textContent = this.score;
 
-        const speed = Math.round(this.plowVelocity.length() * 50);
+        const speed = Math.round(Math.abs(this.forwardVelocity) * 50);
         document.getElementById('speed').textContent = speed;
 
         const progress = Math.round((this.score / this.totalSnowBlocks) * 100);
@@ -401,30 +612,55 @@ class VoxelSnowPlowGame {
     }
 
     updateCamera() {
-        // Follow camera with smooth interpolation
+        // Enhanced camera with look-ahead and smooth following
+        const speed = Math.abs(this.forwardVelocity);
+
+        // Dynamic camera distance based on speed
+        const dynamicDistance = this.cameraDistance + (speed * 8);
+        const dynamicHeight = this.cameraHeight + (speed * 4);
+
+        // Camera position behind vehicle
         const idealOffset = new THREE.Vector3(
-            -Math.sin(this.plowRotation) * 15,
-            12,
-            -Math.cos(this.plowRotation) * 15
+            -Math.sin(this.plowRotation) * dynamicDistance,
+            dynamicHeight,
+            -Math.cos(this.plowRotation) * dynamicDistance
         );
 
-        const idealLookAt = this.snowPlow.position.clone();
-        idealLookAt.y += 2;
+        // Look-ahead point (further when going faster)
+        const lookAheadDistance = this.cameraLookAhead + (speed * 6);
+        const idealLookAt = new THREE.Vector3(
+            this.snowPlow.position.x + Math.sin(this.plowRotation) * lookAheadDistance,
+            this.snowPlow.position.y + 2,
+            this.snowPlow.position.z + Math.cos(this.plowRotation) * lookAheadDistance
+        );
 
-        // Smooth camera movement
-        const t = 0.1;
-        this.camera.position.x += (this.snowPlow.position.x + idealOffset.x - this.camera.position.x) * t;
-        this.camera.position.y += (this.snowPlow.position.y + idealOffset.y - this.camera.position.y) * t;
-        this.camera.position.z += (this.snowPlow.position.z + idealOffset.z - this.camera.position.z) * t;
+        // Smooth camera movement with separate smoothing for position and look
+        this.cameraTargetPos.x += (this.snowPlow.position.x + idealOffset.x - this.cameraTargetPos.x) * this.cameraSmoothing;
+        this.cameraTargetPos.y += (this.snowPlow.position.y + idealOffset.y - this.cameraTargetPos.y) * this.cameraSmoothing;
+        this.cameraTargetPos.z += (this.snowPlow.position.z + idealOffset.z - this.cameraTargetPos.z) * this.cameraSmoothing;
 
-        this.camera.lookAt(idealLookAt);
+        this.cameraTargetLook.x += (idealLookAt.x - this.cameraTargetLook.x) * this.cameraSmoothing * 1.2;
+        this.cameraTargetLook.y += (idealLookAt.y - this.cameraTargetLook.y) * this.cameraSmoothing * 1.2;
+        this.cameraTargetLook.z += (idealLookAt.z - this.cameraTargetLook.z) * this.cameraSmoothing * 1.2;
+
+        this.camera.position.copy(this.cameraTargetPos);
+        this.camera.lookAt(this.cameraTargetLook);
     }
 
     resetPlowPosition() {
         this.snowPlow.position.set(0, 0, 0);
-        this.plowVelocity.set(0, 0, 0);
+        this.forwardVelocity = 0;
+        this.lateralVelocity = 0;
         this.plowRotation = 0;
         this.plowRotationVelocity = 0;
+        this.bodyTilt = 0;
+        this.snowPlowBody.rotation.z = 0;
+
+        // Clear particles and tracks
+        this.particles.forEach(p => this.scene.remove(p));
+        this.particles = [];
+        this.tireTrackMarks.forEach(t => this.scene.remove(t));
+        this.tireTrackMarks = [];
     }
 
     gameComplete() {
