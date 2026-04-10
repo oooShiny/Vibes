@@ -1,0 +1,1974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🚛</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; background: #f0ede6; }
+  canvas { display: block; }
+
+  #loader {
+    position: fixed; inset: 0;
+    background: #f0ede6;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    transition: opacity 0.8s ease;
+    font-family: 'Courier New', monospace;
+  }
+  #loader.hidden { opacity: 0; pointer-events: none; }
+  #loader-text {
+    font-size: 13px;
+    letter-spacing: 0.25em;
+    color: #888;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+  #loader-bar-wrap {
+    width: 160px; height: 2px;
+    background: #ddd;
+  }
+  #loader-bar {
+    height: 100%; width: 0%;
+    background: #333;
+    transition: width 0.3s ease;
+  }
+  #start-btn {
+    margin-top: 40px;
+    padding: 12px 40px;
+    background: #333;
+    color: #f0ede6;
+    border: none;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: none;
+    transition: background 0.2s;
+  }
+  #start-btn:hover { background: #111; }
+
+  #reset-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 18px;
+    background: rgba(0,0,0,0.55);
+    color: rgba(255,255,255,0.85);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    font-family: "Courier New", monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    z-index: 50;
+    backdrop-filter: blur(6px);
+    transition: background 0.15s;
+    display: none;
+  }
+  #reset-btn:hover { background: rgba(0,0,0,0.8); }
+
+  #vehicle-select-screen {
+    position: fixed; inset: 0; background: #e8f4f8;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 90; font-family: 'Courier New', monospace;
+    transition: opacity 0.5s ease;
+  }
+  #vehicle-select-screen.hidden { opacity: 0; pointer-events: none; }
+  #vsel-title {
+    font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase;
+    color: #888; margin-bottom: 28px;
+  }
+  #vsel-cards {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    justify-content: center; max-width: 900px;
+    padding: 0 20px;
+  }
+  .vsel-card {
+    width: 200px; background: rgba(0,0,0,0.06);
+    border: 2px solid transparent; border-radius: 8px;
+    padding: 16px; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+  }
+  .vsel-card:hover { background: rgba(0,0,0,0.1); border-color: rgba(0,0,0,0.15); }
+  .vsel-card.selected { border-color: #333; background: rgba(0,0,0,0.12); }
+  .vsel-card-name {
+    font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #333; margin-bottom: 10px; font-weight: bold;
+  }
+  .vsel-card-desc {
+    font-size: 10px; color: #888; line-height: 1.6; margin-bottom: 12px;
+    letter-spacing: 0.04em;
+  }
+  .vsel-stat { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  .vsel-stat-label { font-size: 8px; color: #999; letter-spacing: 0.12em; width: 56px; }
+  .vsel-stat-bar { flex: 1; height: 3px; background: rgba(0,0,0,0.1); border-radius: 2px; }
+  .vsel-stat-fill { height: 100%; border-radius: 2px; background: #333; transition: width 0.3s; }
+  #vsel-confirm {
+    margin-top: 28px; padding: 12px 48px;
+    background: #333; color: #f0ede6;
+    border: none; border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+    cursor: pointer; transition: background 0.15s;
+  }
+  #vsel-confirm:hover { background: #111; }
+
+  #score-hud {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 200px;
+    background: rgba(10,10,10,0.72);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: "Courier New", monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.7);
+    z-index: 50;
+    backdrop-filter: blur(8px);
+    display: none;
+  }
+  #score-hud h3 {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 10px;
+  }
+  .score-row { margin-bottom: 8px; }
+  .score-label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    font-size: 9px;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.05em;
+  }
+  .score-label .pct { color: rgba(255,255,255,0.85); }
+  .score-bar-bg {
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%;
+    background: rgba(100,180,255,0.7);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.4s ease, background 0.4s ease;
+  }
+  .score-bar-fill.complete { background: rgba(80,220,120,0.9); }
+  .score-row.complete .score-label { color: rgba(80,220,120,0.85); }
+  .score-total { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); }
+  .score-total .score-bar-fill { background: rgba(255,255,255,0.6); height: 5px; }
+  .score-total .score-bar-bg { height: 5px; }
+  @keyframes flash-complete {
+    0%   { background: rgba(80,220,120,0.95); }
+    50%  { background: rgba(80,220,120,0.3); }
+    100% { background: rgba(80,220,120,0.95); }
+  }
+  .score-bar-fill.just-completed { animation: flash-complete 0.4s ease 3; }    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+</style>
+</head>
+<body>
+
+<div id="vehicle-select-screen">
+  <div id="vsel-title">Select your vehicle</div>
+  <div id="vsel-cards"></div>
+  <button id="vsel-confirm">Drive →</button>
+</div>
+
+<div id="loader">
+  <div id="loader-text">Loading</div>
+  <div id="loader-bar-wrap"><div id="loader-bar"></div></div>
+  <button id="start-btn">Start</button>
+</div>
+
+<button id="reset-btn">↺ Reset</button>
+
+<div id="score-hud">
+  <h3>Snow cleared</h3>
+  <div class="score-row" id="sr-house1">
+    <div class="score-label"><span>Driveway 1</span><span class="pct" id="sp-house1">0%</span></div>
+    <div class="score-bar-bg"><div class="score-bar-fill" id="sb-house1"></div></div>
+  </div>
+  <div class="score-row" id="sr-house2">
+    <div class="score-label"><span>Driveway 2</span><span class="pct" id="sp-house2">0%</span></div>
+    <div class="score-bar-bg"><div class="score-bar-fill" id="sb-house2"></div></div>
+  </div>
+  <div class="score-row" id="sr-house3">
+    <div class="score-label"><span>Driveway 3</span><span class="pct" id="sp-house3">0%</span></div>
+    <div class="score-bar-bg"><div class="score-bar-fill" id="sb-house3"></div></div>
+  </div>
+  <div class="score-row" id="sr-road">
+    <div class="score-label"><span>Road</span><span class="pct" id="sp-road">0%</span></div>
+    <div class="score-bar-bg"><div class="score-bar-fill" id="sb-road"></div></div>
+  </div>
+  <div class="score-row score-total">
+    <div class="score-label"><span>Total</span><span class="pct" id="sp-total">0%</span></div>
+    <div class="score-bar-bg"><div class="score-bar-fill" id="sb-total"></div></div>
+  </div>
+</div>
+
+
+
+<!-- Cannon.js physics -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+<!-- Three.js r128 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+
+<script>
+'use strict';
+
+// ============================================================
+// MATCAP GENERATOR
+// Creates Bruno Simon-style matcap textures procedurally in canvas
+// ============================================================
+function createMatcapTexture(config) {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2, cy = size / 2, r = size / 2;
+
+  // Base fill
+  ctx.fillStyle = config.base;
+  ctx.fillRect(0, 0, size, size);
+
+  // Circular clip
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Dark bottom
+  const grad = ctx.createRadialGradient(cx, cy * 0.6, 0, cx, cy, r);
+  grad.addColorStop(0, config.highlight);
+  grad.addColorStop(0.5, config.mid);
+  grad.addColorStop(1, config.shadow);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  // Specular highlight
+  const spec = ctx.createRadialGradient(cx * 0.65, cy * 0.45, 0, cx * 0.65, cy * 0.45, r * 0.35);
+  spec.addColorStop(0, 'rgba(255,255,255,0.85)');
+  spec.addColorStop(0.5, 'rgba(255,255,255,0.15)');
+  spec.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = spec;
+  ctx.fillRect(0, 0, size, size);
+
+  // Rim light (bottom right edge)
+  const rim = ctx.createRadialGradient(cx * 1.55, cy * 1.55, 0, cx * 1.55, cy * 1.55, r * 0.5);
+  rim.addColorStop(0, config.rim || 'rgba(255,200,100,0.3)');
+  rim.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = rim;
+  ctx.fillRect(0, 0, size, size);
+
+  ctx.restore();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Matcap library — different materials
+const MATCAPS = {};
+function buildMatcaps() {
+  MATCAPS.red = createMatcapTexture({
+    base: '#c0392b', highlight: '#e8453a', mid: '#c0392b', shadow: '#6e1a14',
+    rim: 'rgba(255,180,100,0.4)'
+  });
+  MATCAPS.white = createMatcapTexture({
+    base: '#e8e4dc', highlight: '#ffffff', mid: '#e0dbd0', shadow: '#b0a898',
+    rim: 'rgba(255,220,150,0.3)'
+  });
+  MATCAPS.dark = createMatcapTexture({
+    base: '#1a1a1a', highlight: '#444444', mid: '#222222', shadow: '#080808',
+    rim: 'rgba(100,150,255,0.2)'
+  });
+  MATCAPS.chrome = createMatcapTexture({
+    base: '#888888', highlight: '#ffffff', mid: '#aaaaaa', shadow: '#333333',
+    rim: 'rgba(200,220,255,0.5)'
+  });
+  MATCAPS.orange = createMatcapTexture({
+    base: '#e67e22', highlight: '#f39c12', mid: '#e67e22', shadow: '#8e4a0e',
+    rim: 'rgba(255,200,100,0.4)'
+  });
+  MATCAPS.green = createMatcapTexture({
+    base: '#4a7c3f', highlight: '#6aac5e', mid: '#4a7c3f', shadow: '#1e3a1a',
+    rim: 'rgba(255,220,150,0.25)'
+  });
+  MATCAPS.tan = createMatcapTexture({
+    base: '#a08060', highlight: '#c4a882', mid: '#a08060', shadow: '#5a4030',
+    rim: 'rgba(255,200,100,0.3)'
+  });
+  MATCAPS.blue = createMatcapTexture({
+    base: '#2471a3', highlight: '#3498db', mid: '#2471a3', shadow: '#0e2d47',
+    rim: 'rgba(150,200,255,0.4)'
+  });
+  MATCAPS.glass = createMatcapTexture({
+    base: '#4a7fa5', highlight: '#b0d4f0', mid: '#5a9ac0', shadow: '#1a3a55',
+    rim: 'rgba(255,255,255,0.6)'
+  });
+  MATCAPS.rubber = createMatcapTexture({
+    base: '#1a1a18', highlight: '#2a2a28', mid: '#1e1e1c', shadow: '#080808',
+    rim: 'rgba(80,80,80,0.2)'
+  });
+  MATCAPS.yellow = createMatcapTexture({
+    base: '#f1c40f', highlight: '#f9e44a', mid: '#f1c40f', shadow: '#8a6e00',
+    rim: 'rgba(255,240,180,0.4)'
+  });
+}
+
+function matcapMat(name, opts = {}) {
+  return new THREE.MeshMatcapMaterial({
+    matcap: MATCAPS[name],
+    ...opts
+  });
+}
+
+// ============================================================
+// TIME
+// ============================================================
+class Time {
+  constructor() {
+    this.startTime = performance.now();
+    this.current = this.startTime;
+    this.delta = 0;
+    this.elapsed = 0;
+  }
+  tick() {
+    const now = performance.now();
+    this.delta = Math.min((now - this.current) / 1000, 1/30);
+    this.elapsed = (now - this.startTime) / 1000;
+    this.current = now;
+  }
+}
+
+// ============================================================
+// INPUTS
+// ============================================================
+class Inputs {
+  constructor() {
+    this.map = {};
+    this.steer = 0;
+    this.gas = 0;
+    this.reverse = 0;
+    this.brake = 0;
+
+    const reset = () => { this.map = {}; };
+
+    window.addEventListener('keydown', e => {
+      this.map[e.code] = true;
+      e.preventDefault();
+    });
+    window.addEventListener('keyup', e => {
+      this.map[e.code] = false;
+    });
+
+    // Clear all keys on any focus loss — covers iframe, tab switch, alt-tab
+    window.addEventListener('blur', reset);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) reset();
+    });
+    // If a keydown fires without a prior keydown for that key tracked,
+    // it means we missed keyups while unfocused — reset to be safe
+    window.addEventListener('focus', reset);
+  }
+
+  update() {
+    const m = this.map;
+    this.gas     = (m['KeyW'] || m['ArrowUp'])    ? 1 : 0;
+    this.reverse = (m['KeyS'] || m['ArrowDown'])   ? 1 : 0;
+    this.steer   = ((m['KeyD'] || m['ArrowRight']) ? 1 : 0) - ((m['KeyA'] || m['ArrowLeft']) ? 1 : 0);
+    this.brake   = m['Space'] ? 1 : 0;
+  }
+}
+
+// ============================================================
+// PHYSICAL VEHICLE — Cannon.js RaycastVehicle
+// ============================================================
+class PhysicalVehicle {
+  constructor(world, cfg = {}) {
+    this.world = world;
+    const mass            = cfg.mass            || 150;
+    const suspStiffness   = cfg.suspensionStiffness || 35;
+    const frictionSlip    = cfg.frictionSlip    || 2.2;
+
+    // Chassis body
+    const chassisShape = new CANNON.Box(new CANNON.Vec3(0.95, 0.3, 2.0));
+    this.chassisBody = new CANNON.Body({ mass });
+    this.chassisBody.collisionFilterGroup = 1;
+    this.chassisBody.collisionFilterMask  = 1 | 4 | 8 | 16; // chassis hits chassis, objects, world, and snow blocks
+    this.chassisBody.addShape(chassisShape, new CANNON.Vec3(0, 0.3, 0));
+    // Front bumper shape — low box that contacts snow blocks at ground level
+    const bumperShape = new CANNON.Box(new CANNON.Vec3(0.9, 0.28, 0.2));
+    this.chassisBody.addShape(bumperShape, new CANNON.Vec3(0, -0.1, -2.0));
+    // Spawn position set here; overridden by map.json spawn point in main() if present
+    this.chassisBody.position.set(0, 2.5, 0);
+    this.chassisBody.linearDamping = 0.2;
+    this.chassisBody.angularDamping = 0.4;
+    world.addBody(this.chassisBody);
+
+    // RaycastVehicle
+    this.vehicle = new CANNON.RaycastVehicle({
+      chassisBody: this.chassisBody,
+      indexRightAxis: 0,
+      indexUpAxis: 1,
+      indexForwardAxis: 2,
+    });
+
+    // Wheel options
+    const wheelOpts = {
+      radius: 0.4,
+      directionLocal: new CANNON.Vec3(0, -1, 0),
+      suspensionStiffness: suspStiffness,
+      suspensionRestLength: 0.35,
+      frictionSlip: frictionSlip,
+      dampingRelaxation: 2.5,
+      dampingCompression: 4.0,
+      maxSuspensionForce: 100000,
+      rollInfluence: 0.05,
+      axleLocal: new CANNON.Vec3(1, 0, 0),
+      chassisConnectionPointLocal: new CANNON.Vec3(),
+      maxSuspensionTravel: 0.25,
+      customSlidingRotationalSpeed: -30,
+      useCustomSlidingRotationalSpeed: true,
+    };
+
+    const height = 0.1;
+
+    // Use wheel positions from vehicle definition if provided, else default 4-wheel layout
+    const wheelDefs = (cfg.wheels && cfg.wheels.length >= 2)
+      ? cfg.wheels
+      : [
+          { x: -0.88, z: -1.15, steer: true,  drive: false },
+          { x:  0.88, z: -1.15, steer: true,  drive: false },
+          { x: -0.88, z:  1.15, steer: false, drive: true  },
+          { x:  0.88, z:  1.15, steer: false, drive: true  },
+        ];
+
+    // Track which wheels steer and which drive, for use in update()
+    this.steerWheels = wheelDefs.map((w, i) => w.steer  ? i : -1).filter(i => i >= 0);
+    this.driveWheels = wheelDefs.map((w, i) => w.drive  ? i : -1).filter(i => i >= 0);
+    // If no drive wheels defined, drive the rear half
+    if (!this.driveWheels.length) {
+      this.driveWheels = wheelDefs.map((_, i) => i).filter(i => i >= Math.floor(wheelDefs.length / 2));
+    }
+
+    wheelDefs.forEach(w => {
+      const pos = new CANNON.Vec3(w.x || 0, height, w.z || 0);
+      const opts = Object.assign({}, wheelOpts, {
+        chassisConnectionPointLocal: pos,
+        isFrontWheel: !!w.steer,
+      });
+      this.vehicle.addWheel(opts);
+    });
+
+    this.vehicle.addToWorld(world);
+
+    // Wheel physics bodies (for visualization only)
+    this.wheelBodies = this.vehicle.wheelInfos.map(() => {
+      const shape = new CANNON.Cylinder(0.4, 0.4, 0.28, 16);
+      const body = new CANNON.Body({ mass: 0 });
+      const q = new CANNON.Quaternion();
+      q.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2);
+      body.addShape(shape, new CANNON.Vec3(), q);
+      return body;
+    });
+
+    // Config — driven by vehicle definition
+    this.maxEngineForce   = cfg.engineForce    || 1800;
+    this.maxBrakeForce    = cfg.brakeForce     || 80;
+    this.maxSteerAngle    = cfg.maxSteerAngle  || 0.52;
+    this.steerAngle       = 0;
+    this.steerSpeed       = cfg.steerSpeed     || 2.8;
+    this.steerReturn      = cfg.steerReturn    || 4.0;
+    this.maxSpeed         = cfg.topSpeed       || 14; // m/s cap
+
+    // Plow physics — kinematic box that pushes snow/objects but not chassis
+    // Collision group: plow=2, chassis/wheels=1, snow/objects=4
+    // Plow collides with snow/objects (group 4) but NOT with chassis (group 1)
+    const plowBody = new CANNON.Body({ mass: 0 });
+    plowBody.addShape(new CANNON.Box(new CANNON.Vec3(1.25, 0.45, 0.15)));
+    plowBody.position.set(0, 1.0, 0);
+    plowBody.type = CANNON.Body.KINEMATIC;
+    plowBody.collisionFilterGroup = 2;
+    plowBody.collisionFilterMask  = 4; // only hit objects in group 4
+    world.addBody(plowBody);
+    this.plowBody = plowBody;
+
+    // Exposed state for camera/visual
+    this.speed = 0;
+    this.snowDrag = 0; // set by world each frame — total weight being pushed
+  }
+
+  update(inputs, dt) {
+    const v = this.vehicle;
+
+    // Steer
+    const targetSteer = -inputs.steer * this.maxSteerAngle;
+    const diff = targetSteer - this.steerAngle;
+    const rate = inputs.steer !== 0 ? this.steerSpeed : this.steerReturn;
+    this.steerAngle += Math.sign(diff) * Math.min(Math.abs(diff), rate * dt);
+
+    this.steerWheels.forEach(i => v.setSteeringValue(this.steerAngle, i));
+
+    // Determine direction of travel
+    const vel = this.chassisBody.velocity;
+    const fwd = new CANNON.Vec3(0, 0, 1);
+    this.chassisBody.quaternion.vmult(fwd, fwd);
+    const dot = vel.dot(fwd);
+    this.speed = dot; // signed
+
+    // Engine / brake
+    const nWheels = this.vehicle.wheelInfos.length;
+    if (inputs.brake) {
+      for (let i = 0; i < nWheels; i++) v.setBrake(this.maxBrakeForce, i);
+      this.driveWheels.forEach(i => v.applyEngineForce(0, i));
+    } else {
+      for (let i = 0; i < nWheels; i++) v.setBrake(i < this.steerWheels.length ? 0 : 2, i);
+
+      let engineForce = 0;
+      if (inputs.gas)     engineForce =  this.maxEngineForce;
+      if (inputs.reverse) engineForce = -this.maxEngineForce * 0.35; // gentler reverse
+
+      // Speed cap — taper engine force above maxSpeed over a 6 m/s window
+      // Reverse is capped at 40% of forward top speed
+      const curSpeed = Math.abs(this.speed);
+      const effectiveMax = engineForce < 0 ? this.maxSpeed * 0.4 : this.maxSpeed;
+      if (curSpeed > effectiveMax && engineForce !== 0 && Math.sign(engineForce) === Math.sign(this.speed)) {
+        engineForce *= Math.max(0, 1 - (curSpeed - effectiveMax) / 4);
+      }
+
+      this.driveWheels.forEach(i => v.applyEngineForce(engineForce, i));
+    }
+
+    // Snow drag — push back against forward motion proportional to pushed snow weight
+    if (this.snowDrag > 0 && Math.abs(this.speed) > 0.1) {
+      const dragMag = Math.min(this.snowDrag * 180, this.maxEngineForce * 0.95);
+      const fwdDir = new CANNON.Vec3(0, 0, -1);
+      this.chassisBody.quaternion.vmult(fwdDir, fwdDir);
+      // Force opposes forward motion — fwdDir points in +Z (truck's local forward)
+      // but truck actually travels in -Z, so negate to push back against travel direction
+      const sign = this.speed > 0 ? 1 : -1;
+      this.chassisBody.applyForce(
+        new CANNON.Vec3(fwdDir.x * dragMag * sign, 0, fwdDir.z * dragMag * sign),
+        this.chassisBody.position
+      );
+    }
+
+    // Update wheel body transforms (used by VisualVehicle)
+    v.wheelInfos.forEach((wheel, i) => {
+      v.updateWheelTransform(i);
+      const t = wheel.worldTransform;
+      this.wheelBodies[i].position.copy(t.position);
+      this.wheelBodies[i].quaternion.copy(t.quaternion);
+    });
+
+    // Sync plow kinematic body — offset forward (-Z) in chassis local space
+    // Only rotate the XZ offset, set Y in world space so it stays at snowball height
+    const plowOffset = new CANNON.Vec3(0, 0, -2.5);
+    this.chassisBody.quaternion.vmult(plowOffset, plowOffset);
+    this.plowBody.position.set(
+      this.chassisBody.position.x + plowOffset.x,
+      0, // world-space Y — plow at ground level
+      this.chassisBody.position.z + plowOffset.z
+    );
+    this.plowBody.quaternion.copy(this.chassisBody.quaternion);
+  }
+
+  get position() { return this.chassisBody.position; }
+  get quaternion() { return this.chassisBody.quaternion; }
+}
+
+
+// ============================================================
+// VEHICLES REGISTRY
+// Add new vehicles here. Each entry has:
+//   name, description, physics config, and a build() function
+// ============================================================
+const VEHICLES = [
+  {
+    name: 'Base Truck',
+    description: 'A sturdy all-purpose plow truck. Balanced handling and good power.',
+    physics: {
+      mass: 150,
+      topSpeed: 14,
+      engineForce: 1800,
+      brakeForce: 80,
+      maxSteerAngle: 0.52,
+      steerSpeed: 2.8,
+      steerReturn: 4.0,
+      suspensionStiffness: 35,
+      frictionSlip: 2.2,
+      wheels: [
+        { x: -0.88, z: -1.15, steer: true,  drive: false },
+        { x:  0.88, z: -1.15, steer: true,  drive: false },
+        { x: -0.88, z:  1.15, steer: false, drive: true  },
+        { x:  0.88, z:  1.15, steer: false, drive: true  },
+      ],
+    },
+    build(bodyGroup, scene, wheelGroups) {
+      const body = bodyGroup;
+      const box = (w,h,d,mat) => new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+      const cyl = (rt,rb,h,s,mat) => new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,s), mat);
+      const m_blue   = matcapMat('blue');
+      const m_glass  = matcapMat('glass');
+      const m_dark   = matcapMat('dark');
+      const m_chrome = matcapMat('chrome');
+      const m_red    = matcapMat('red');
+      const m_yellow = matcapMat('yellow');
+      const m_rubber = matcapMat('rubber');
+      const m_white  = matcapMat('white');
+      const lowerBody = box(1.9, 0.55, 1.98, m_blue); lowerBody.position.set(0, 0.72, -0.96); body.add(lowerBody);
+      const cabBody = box(1.84, 0.62, 0.93, m_blue); cabBody.position.set(0, 1.28, -0.43); body.add(cabBody);
+      const cabRoof = box(1.82, 0.14, 0.93, m_blue); cabRoof.position.set(0, 1.66, -0.43); body.add(cabRoof);
+      const hood = box(1.82, 0.18, 1.05, m_blue); hood.position.set(0, 0.97, -1.44); body.add(hood);
+      const windshield = box(1.5, 0.83, 0.05, m_glass); windshield.position.set(0.04, 1.19, -1.13); windshield.rotation.x = 0.69; body.add(windshield);
+      const rearWindow = box(1.6, 0.42, 0.07, m_glass); rearWindow.position.set(0, 1.35, 0.03); body.add(rearWindow);
+      [-0.92, 0.92].forEach(x => { const sw = box(0.07, 0.38, 0.7, m_glass); sw.position.set(x, 1.36, -0.46); body.add(sw); });
+      const grille = box(0.76, 0.21, 0.19, m_dark); grille.position.set(-0.01, 0.79, -1.88); body.add(grille);
+      const fBumper = box(1.92, 0.2, 0.22, m_dark); fBumper.position.set(-0.02, 0.52, -1.97); body.add(fBumper);
+      [[-0.58, 0.82], [0.58, 0.83]].forEach(([x, y]) => { const hl = cyl(0.16, 0.16, 0.1, 16, m_chrome); hl.rotation.x = Math.PI/2; hl.position.set(x, y, -1.96); body.add(hl); });
+      const bedFloor = box(1.66, 0.12, 2.26, m_chrome); bedFloor.position.set(0, 0.77, 1.12); body.add(bedFloor);
+      [[-0.88, 1.16], [0.88, 1.13]].forEach(([x, z]) => { const bw = box(0.14, 0.46, 2.26, m_blue); bw.position.set(x, 0.97, z); body.add(bw); });
+      const tailgate = box(1.66, 0.46, 0.12, m_blue); tailgate.position.set(0, 0.97, 2.22); body.add(tailgate);
+      [-0.7, 0.7].forEach(x => { const tl = box(0.14, 0.18, 0.06, m_red); tl.position.set(x, 0.97, 2.31); body.add(tl); });
+      const hitch = box(0.12, 0.12, 0.22, m_chrome); hitch.position.set(0, 0.45, 2.34); body.add(hitch);
+      [-0.62, 0.62].forEach(x => { const rb = cyl(0.06, 0.06, 0.82, 16, m_dark); rb.position.set(x, 1.52, -0.15); body.add(rb); });
+      const rbTop = box(1.24, 0.1, 0.12, m_dark); rbTop.position.set(0, 1.94, -0.15); body.add(rbTop);
+      const plowBlade = box(2.4, 0.62, 0.1, m_yellow); plowBlade.position.set(0, 0.05, -2.52); plowBlade.rotation.x = 0.22; body.add(plowBlade);
+      [-0.55, 0.55].forEach(x => { const arm = box(0.08, 0.08, 0.55, m_chrome); arm.position.set(x, 0.05, -2.22); body.add(arm); });
+      const plowCap = box(2.44, 0.08, 0.12, m_chrome); plowCap.position.set(0, 0.37, -2.51); body.add(plowCap);
+      const plowSkid = box(2.44, 0.07, 0.12, m_dark); plowSkid.position.set(0, -0.28, -2.53); body.add(plowSkid);
+      [-0.87, 0.87].forEach(x => { const arch = cyl(0.47, 0.47, 0.35, 16, m_blue); arch.rotation.z = Math.PI/2; arch.position.set(x, 0.57, 1.19); body.add(arch); });
+      const cargoBox = box(1.89, 0.21, 0.77, m_dark); cargoBox.position.set(0, 0.63, 1.93); body.add(cargoBox);
+      const plate = box(0.56, 0.16, 0.05, m_chrome); plate.position.set(0, 0.84, 2.28); body.add(plate);
+      for (let i = 0; i < 4; i++) {
+        const wg = new THREE.Group(); scene.add(wg);
+        const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.34,18), m_rubber); tire.rotation.z = Math.PI/2; wg.add(tire);
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,0.35,10), m_white); rim.rotation.z = Math.PI/2; wg.add(rim);
+        for (let s=0;s<5;s++) { const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.36,0.06,0.06), m_dark); spoke.rotation.x=(s/5)*Math.PI*2; wg.add(spoke); }
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.37,8), m_dark); hub.rotation.z = Math.PI/2; wg.add(hub);
+        wheelGroups.push(wg);
+      }
+    }
+  },
+  // ── ADD MORE VEHICLES BELOW ───────────────────────────────
+  // Paste exported vehicle entries here from the vehicle builder
+];
+
+// ============================================================
+// VISUAL VEHICLE — Three.js mesh, reads from PhysicalVehicle
+// ============================================================
+class VisualVehicle {
+  constructor(scene, vehicleDef) {
+    this.scene = scene;
+    this.group = new THREE.Group();
+    scene.add(this.group);
+
+    this.bodyGroup = new THREE.Group();
+    this.group.add(this.bodyGroup);
+
+    this.wheelGroups = [];
+    this.params = {
+      cabZ: -0.43, cabD: 0.93, cabH: 0.62,
+      zFwd: 0.72, zBck: 0.05, yBot: 1.02, wedgeZ: -1.57,
+      hoodY: 0.97, hoodD: 2.83, hoodZ: -0.5,
+    };
+    this._buildFromDef(vehicleDef);
+  }
+
+  _buildWheels() {
+    const mRubber = matcapMat('rubber');
+    const mWhite  = matcapMat('white');
+    const mDark   = matcapMat('dark');
+    for (let i = 0; i < 4; i++) {
+      const wg = new THREE.Group();
+      this.scene.add(wg);
+      const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.34, 18), mRubber);
+      tire.rotation.z = Math.PI / 2;
+      wg.add(tire);
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.35, 10), mWhite);
+      rim.rotation.z = Math.PI / 2;
+      wg.add(rim);
+      for (let s = 0; s < 5; s++) {
+        const angle = (s / 5) * Math.PI * 2;
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.06, 0.06), mDark);
+        spoke.rotation.x = angle;
+        wg.add(spoke);
+      }
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.37, 8), mDark);
+      hub.rotation.z = Math.PI / 2;
+      wg.add(hub);
+      this.wheelGroups.push(wg);
+    }
+  }
+
+  _buildFromDef(def) {
+    // Call vehicle definition's build function
+    def.build(this.bodyGroup, this.scene, this.wheelGroups);
+
+    // Shadow blob (always added regardless of vehicle)
+    const shadowGeo = new THREE.PlaneGeometry(2.4, 4.6);
+    const shadowMat = new THREE.MeshBasicMaterial({color:0,transparent:true,opacity:0.22,depthWrite:false});
+    this.shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+    this.shadowMesh.rotation.x = -Math.PI/2;
+    this.shadowMesh.renderOrder = -1;
+    this.scene.add(this.shadowMesh);
+    this._antVel=0; this._antAngle=0; this._prevSpeed=0; this.antenna=null;
+  }
+
+  _build() {
+    const body = this.bodyGroup;
+    const p = this.params;
+    const box = (w,h,d,mat) => new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+    const cyl = (rt,rb,h,s,mat) => new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,s), mat);
+
+    const m_blue   = matcapMat('blue');
+    const m_glass  = matcapMat('glass');
+    const m_dark   = matcapMat('dark');
+    const m_chrome = matcapMat('chrome');
+    const m_red    = matcapMat('red');
+    const m_yellow = matcapMat('yellow');
+    const m_rubber = matcapMat('rubber');
+    const m_white  = matcapMat('white');
+
+    const lowerBody = box(1.9, 0.55, 1.98, m_blue);
+    lowerBody.position.set(0, 0.72, -0.96); body.add(lowerBody);
+
+    const cabBody = box(1.84, 0.62, 0.93, m_blue);
+    cabBody.position.set(0, 1.28, -0.43); body.add(cabBody);
+
+    const cabRoof = box(1.82, 0.14, 0.93, m_blue);
+    cabRoof.position.set(0, 1.66, -0.43); body.add(cabRoof);
+
+    const hood = box(1.82, 0.18, 1.05, m_blue);
+    hood.position.set(0, 0.97, -1.44); body.add(hood);
+
+    const windshield = box(1.5, 0.83, 0.05, m_glass);
+    windshield.position.set(0.04, 1.19, -1.13);
+    windshield.rotation.x = 0.69; body.add(windshield);
+
+    const rearWindow = box(1.6, 0.42, 0.07, m_glass);
+    rearWindow.position.set(0, 1.35, 0.03); body.add(rearWindow);
+
+    [-0.92, 0.92].forEach(x => {
+      const sw = box(0.07, 0.38, 0.7, m_glass);
+      sw.position.set(x, 1.36, -0.46); body.add(sw);
+    });
+
+    const grille = box(0.76, 0.21, 0.19, m_dark);
+    grille.position.set(-0.01, 0.79, -1.88); body.add(grille);
+
+    const fBumper = box(1.92, 0.2, 0.22, m_dark);
+    fBumper.position.set(-0.02, 0.52, -1.97); body.add(fBumper);
+
+    [[-0.58, 0.82], [0.58, 0.83]].forEach(([x, y]) => {
+      const hl = cyl(0.16, 0.16, 0.1, 16, m_chrome);
+      hl.rotation.x = Math.PI / 2;
+      hl.position.set(x, y, -1.96); body.add(hl);
+    });
+
+    const bedFloor = box(1.66, 0.12, 2.26, m_chrome);
+    bedFloor.position.set(0, 0.77, 1.12); body.add(bedFloor);
+
+    [[-0.88, 1.16], [0.88, 1.13]].forEach(([x, z]) => {
+      const bw = box(0.14, 0.46, 2.26, m_blue);
+      bw.position.set(x, 0.97, z); body.add(bw);
+    });
+
+    const tailgate = box(1.66, 0.46, 0.12, m_blue);
+    tailgate.position.set(0, 0.97, 2.22); body.add(tailgate);
+
+    [-0.7, 0.7].forEach(x => {
+      const tl = box(0.14, 0.18, 0.06, m_red);
+      tl.position.set(x, 0.97, 2.31); body.add(tl);
+    });
+
+    const hitch = box(0.12, 0.12, 0.22, m_chrome);
+    hitch.position.set(0, 0.45, 2.34); body.add(hitch);
+
+    [-0.62, 0.62].forEach(x => {
+      const rb = cyl(0.06, 0.06, 0.82, 16, m_dark);
+      rb.position.set(x, 1.52, -0.15); body.add(rb);
+    });
+    const rbTop = box(1.24, 0.1, 0.12, m_dark);
+    rbTop.position.set(0, 1.94, -0.15); body.add(rbTop);
+
+    const plowBlade = box(2.4, 0.62, 0.1, m_yellow);
+    plowBlade.position.set(0, 0.05, -2.52);
+    plowBlade.rotation.x = 0.22; body.add(plowBlade);
+    [-0.55, 0.55].forEach(x => {
+      const arm = box(0.08, 0.08, 0.55, m_chrome);
+      arm.position.set(x, 0.05, -2.22); body.add(arm);
+    });
+    const plowCap = box(2.44, 0.08, 0.12, m_chrome);
+    plowCap.position.set(0, 0.37, -2.51); body.add(plowCap);
+    const plowSkid = box(2.44, 0.07, 0.12, m_dark);
+    plowSkid.position.set(0, -0.28, -2.53); body.add(plowSkid);
+
+    [-0.87, 0.87].forEach(x => {
+      const arch = cyl(0.47, 0.47, 0.35, 16, m_blue);
+      arch.rotation.z = Math.PI / 2;
+      arch.position.set(x, 0.57, 1.19); body.add(arch);
+    });
+
+    const cargoBox = box(1.89, 0.21, 0.77, m_dark);
+    cargoBox.position.set(0, 0.63, 1.93); body.add(cargoBox);
+    const plate = box(0.56, 0.16, 0.05, m_chrome);
+    plate.position.set(0, 0.84, 2.28); body.add(plate);
+
+    for (let i = 0; i < 4; i++) {
+      const wg = new THREE.Group(); this.scene.add(wg);
+      const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.34,18), m_rubber);
+      tire.rotation.z = Math.PI/2; wg.add(tire);
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,0.35,10), m_white);
+      rim.rotation.z = Math.PI/2; wg.add(rim);
+      for (let s=0;s<5;s++) {
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.36,0.06,0.06), m_dark);
+        spoke.rotation.x = (s/5)*Math.PI*2; wg.add(spoke);
+      }
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.37,8), m_dark);
+      hub.rotation.z = Math.PI/2; wg.add(hub);
+      this.wheelGroups.push(wg);
+    }
+
+    const shadowGeo = new THREE.PlaneGeometry(2.4, 4.6);
+    const shadowMat = new THREE.MeshBasicMaterial({color:0,transparent:true,opacity:0.22,depthWrite:false});
+    this.shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+    this.shadowMesh.rotation.x = -Math.PI/2;
+    this.shadowMesh.renderOrder = -1;
+    this.scene.add(this.shadowMesh);
+
+    this._antVel = 0; this._antAngle = 0; this._prevSpeed = 0; this.antenna = null;
+  }
+  update(physVehicle, dt) {
+    const chassis = physVehicle.chassisBody;
+
+    // Sync body group to chassis
+    this.group.position.copy(chassis.position);
+    this.group.quaternion.copy(chassis.quaternion);
+
+    // Sync wheel groups to wheel physics
+    physVehicle.wheelBodies.forEach((wb, i) => {
+      this.wheelGroups[i].position.copy(wb.position);
+      this.wheelGroups[i].quaternion.copy(wb.quaternion);
+    });
+
+    // Shadow blob follows, sits on ground
+    this.shadowMesh.position.set(
+      chassis.position.x,
+      0.01,
+      chassis.position.z
+    );
+    const q = chassis.quaternion;
+    const euler = new THREE.Euler().setFromQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w), 'YXZ');
+    this.shadowMesh.rotation.y = euler.y;
+
+    // Shadow shrinks with height
+    const h = Math.max(0, chassis.position.y - 0.5);
+    const s = Math.max(0, 1 - h * 0.15);
+    this.shadowMesh.scale.setScalar(s);
+    this.shadowMesh.material.opacity = 0.2 * s;
+
+    // Antenna animation (Bruno's technique: spring based on acceleration)
+    const accel = (physVehicle.speed - this._prevSpeed) / dt;
+    this._prevSpeed = physVehicle.speed;
+    const antForce = -accel * 0.012;
+    this._antVel += antForce;
+    this._antVel -= this._antAngle * 8;    // spring
+    this._antVel *= 0.88;                   // damping
+    this._antAngle += this._antVel * dt;
+    this._antAngle = Math.max(-0.6, Math.min(0.6, this._antAngle));
+    if (this.antenna) {
+      this.antenna.rotation.x = this._antAngle;
+    }
+  }
+}
+
+// ============================================================
+// WORLD — Ground, tiles, scenery. Cannon+Three.
+// ============================================================
+class World {
+  constructor(scene, physicsWorld, mapData = null) {
+    this.scene = scene;
+    this.physicsWorld = physicsWorld;
+    this._mapData = mapData;
+    this._build();
+  }
+
+  _build() {
+    // ── Physics ground plane ─────────────────────────────────
+    const groundBody = new CANNON.Body({ mass: 0 });
+    groundBody.collisionFilterGroup = 8;
+    groundBody.collisionFilterMask  = 1 | 4 | 8; // ground ignores plow
+    groundBody.addShape(new CANNON.Plane());
+    groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+    this.physicsWorld.addBody(groundBody);
+
+    // ── Visual ground — flat plane with vertex-colored corners ─
+    // Bruno's technique: 2x2 texture, corners colored, naturally interpolated
+    const groundGeo = new THREE.PlaneGeometry(300, 300, 1, 1);
+
+    // Vertex colors: warm sandy center, darker edges
+    const colorAttr = new Float32Array(4 * 3);
+    // four corners: slightly varied warm tones
+    const cols = [
+      [0.91, 0.87, 0.80],
+      [0.88, 0.84, 0.77],
+      [0.89, 0.85, 0.79],
+      [0.87, 0.83, 0.76],
+    ];
+    cols.forEach((c, i) => {
+      colorAttr[i*3]   = c[0];
+      colorAttr[i*3+1] = c[1];
+      colorAttr[i*3+2] = c[2];
+    });
+    groundGeo.setAttribute('color', new THREE.BufferAttribute(colorAttr, 3));
+
+    const groundMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
+    this.scene.add(ground);
+
+    // ── Floor grid (subtle, Bruno used tile paths) ───────────
+    this._addTileGrid();
+
+    // ── Boundary walls (invisible physics) ───────────────────
+    // Built after scenery so map size is known; handled in _buildFromMap for map-based worlds
+    if (!this._mapData) this._addBoundaries();
+
+    // ── Scenery ──────────────────────────────────────────────
+    if (this._mapData) {
+      this._buildFromMap(this._mapData);
+    } else {
+      this._addScenery();
+    }
+
+  }
+
+  _addTileGrid() {
+    // Neighbourhood ground: grass base, road, driveway, building pads
+    // Tile size 3 units. Map spans roughly x:-38..38, z:-56..56
+    const T = 3; // tile size
+    const mGrass  = new THREE.MeshBasicMaterial({ color: 0x7aab5a }); // green grass
+    const mRoad   = new THREE.MeshBasicMaterial({ color: 0x444444 }); // dark asphalt
+    const mDrive  = new THREE.MeshBasicMaterial({ color: 0x888880 }); // concrete driveway
+    const mBuild  = new THREE.MeshBasicMaterial({ color: 0x9b8b7a }); // building footprint
+
+    // Layout definitions (in tile coords, origin = world 0,0)
+    // Road: runs z-axis (north-south) at x = -4..4 (tile cols -1,0,1) — actually a horizontal road at z=-6 to z=6
+    // Let's do: main road runs along Z at x cols -1,0 (world x -3..3), full Z extent
+    // Driveway branches east from road at z ~ -9..-3, goes to x 9..21
+    // House pad at x 15..24, z -12..-3
+
+    // Road: x tile cols -1,0 (world x -3..3), full Z
+    //
+    // House 1 (east, z~-30): wide 3-tile driveway (rows -12..-9), long run cols 1..8, large pad cols 6..9 rows -13..-10
+    // House 2 (east, z~+9):  narrow 1-tile driveway (row 3), short cols 1..4, small pad cols 3..5 rows 2..4
+    // House 3 (west, z~+25): medium 2-tile driveway (rows 8..9) + widened apron at road (row 8 cols -1..-3), cols -2..-9, pad cols -7..-10 rows 7..9
+
+    const isRoad  = (tx, tz) => tx === -1 || tx === 0;
+    const isDrive = (tx, tz) =>
+      // House 1: wide 3-tile driveway, rows -12..-9, east cols 1..8
+      (tz >= -12 && tz <= -9  && tx >= 1 && tx <= 8)   ||
+      // House 2: narrow 1-tile driveway, row 3 only, short run cols 1..4
+      (tz === 3                && tx >= 1 && tx <= 4)   ||
+      // House 3: 2-tile driveway rows 8..9, with wider apron at row 8 cols -1..-3
+      (tz >= 8  && tz <= 9    && tx >= -9 && tx <= -2) ||
+      (tz === 8                && tx === -3);              // apron widens at road
+    const isBuild = (tx, tz) =>
+      (tx >= 6 && tx <= 9 && tz >= -13 && tz <= -10)  ||  // house 1 pad (4×4 large)
+      (tx >= 3 && tx <= 5 && tz >= 2   && tz <= 4)    ||  // house 2 pad (3×3 small)
+      (tx >= -10 && tx <= -7 && tz >= 7 && tz <= 9);      // house 3 pad (4×3)
+
+    const geo = new THREE.PlaneGeometry(T, T);
+
+    for (let tx = -13; tx <= 13; tx++) {
+      for (let tz = -18; tz <= 18; tz++) {
+        const wx = tx * T + T/2;
+        const wz = tz * T + T/2;
+        if (Math.abs(wx) > 37 || Math.abs(wz) > 55) continue;
+
+        let mat;
+        if (isBuild(tx, tz))      mat = mBuild;
+        else if (isRoad(tx, tz))  mat = mRoad;
+        else if (isDrive(tx, tz)) mat = mDrive;
+        else                      mat = mGrass;
+
+        const tile = new THREE.Mesh(geo, mat);
+        tile.rotation.x = -Math.PI / 2;
+        tile.position.set(tx * T + T/2, 0.002, tz * T + T/2);
+        this.scene.add(tile);
+      }
+    }
+
+    // Road markings — dashed centre line along road
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    for (let tz = -18; tz <= 18; tz++) {
+      if (Math.abs(tz) % 2 === 0) {
+        const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.2, T * 0.5), lineMat);
+        dash.rotation.x = -Math.PI / 2;
+        dash.position.set(0, 0.004, tz * T + T/2);
+        this.scene.add(dash);
+      }
+    }
+  }
+
+  _addBoundaries() {
+    const wallH = 3, wallT = 1;
+    const walls = [
+      { pos: [0, wallH/2, -57], size: [80, wallH, wallT] },
+      { pos: [0, wallH/2,  57], size: [80, wallH, wallT] },
+      { pos: [-39, wallH/2, 0], size: [wallT, wallH, 114] },
+      { pos: [ 39, wallH/2, 0], size: [wallT, wallH, 114] },
+    ];
+
+    walls.forEach(w => {
+      const body = new CANNON.Body({ mass: 0 });
+      body.collisionFilterGroup = 8;
+      body.collisionFilterMask  = 1 | 4 | 8; // walls ignore plow
+      body.addShape(new CANNON.Box(new CANNON.Vec3(w.size[0]/2, w.size[1]/2, w.size[2]/2)));
+      body.position.set(...w.pos);
+      this.physicsWorld.addBody(body);
+
+      // Visual low wall (Bruno uses small wall blocks)
+      this._addWallVisual(w.pos, w.size);
+    });
+  }
+
+  _addWallVisual(pos, size) {
+    const mat = matcapMat('white');
+    // Build out of stacked blocks for Bruno-style brick effect
+    const brickH = 0.5, brickL = 1.2, brickD = 0.6;
+    const cols  = Math.ceil(size[0] / brickL) || 1;
+    const rows  = Math.ceil(size[1] / brickH);
+
+    const isZ = size[2] > size[0];
+    const len = isZ ? size[2] : size[0];
+    const numBricks = Math.ceil(len / brickL);
+
+    for (let row = 0; row < rows; row++) {
+      for (let b = 0; b < numBricks; b++) {
+        const offset = row % 2 === 0 ? 0 : brickL * 0.5;
+        const geo = new THREE.BoxGeometry(brickL - 0.06, brickH - 0.05, brickD - 0.04);
+        const mesh = new THREE.Mesh(geo, mat);
+
+        const bx = isZ ? 0 : (b * brickL - len/2 + brickL/2 + offset);
+        const bz = isZ ? (b * brickL - len/2 + brickL/2 + offset) : 0;
+        mesh.position.set(
+          pos[0] + bx + (Math.random() - 0.5) * 0.02,
+          row * brickH + brickH / 2 + (Math.random() - 0.5) * 0.01,
+          pos[2] + bz + (Math.random() - 0.5) * 0.02
+        );
+        mesh.rotation.y = (Math.random() - 0.5) * 0.04;
+        this.scene.add(mesh);
+      }
+    }
+  }
+
+  _buildFromMap(mapData) {
+    const CELL = mapData.tileSize || 1.5;
+    const COLS = mapData.cols || 100;
+    const ROWS = mapData.rows || 100;
+    const tileStr = mapData.tiles || '';
+    const originX = -(COLS / 2) * CELL;
+    const originZ = -(ROWS / 2) * CELL;
+
+    // Tile type codes → visual material colors
+    const TILE_COLORS = {
+      G: 0x7aab5a, // grass
+      R: 0x444444, // road
+      S: 0x888880, // sidewalk
+      D: 0x888880, // driveway
+      P: 0x555558, // parking
+      H: null,     // house footprint — no ground tile
+    };
+
+    // Draw ground tiles
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        const ch = tileStr[row * COLS + col] || 'G';
+        const color = TILE_COLORS[ch];
+        if (color === null) continue; // house footprint — skip
+        const geo = new THREE.PlaneGeometry(CELL, CELL);
+        const mat = new THREE.MeshBasicMaterial({ color });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(
+          originX + (col + 0.5) * CELL,
+          0.001,
+          originZ + (row + 0.5) * CELL
+        );
+        this.scene.add(mesh);
+
+
+      }
+    }
+
+    // Buildings
+    (mapData.buildings || []).forEach((b, bi) => {
+      const wx = originX + b.col * CELL + b.w / 2;
+      const wz = originZ + b.row * CELL + b.d / 2;
+      this._addHouse(wx, wz, b.w, b.d);
+    });
+
+    // Boundaries scaled to map size
+    const mapW = COLS * CELL;
+    const mapD = ROWS * CELL;
+    const halfW = mapW / 2, halfD = mapD / 2;
+    const wallH = 3, wallT = 1;
+    [
+      { pos: [0, wallH/2, -halfD - wallT/2], size: [mapW + wallT*2, wallH, wallT] },
+      { pos: [0, wallH/2,  halfD + wallT/2], size: [mapW + wallT*2, wallH, wallT] },
+      { pos: [-halfW - wallT/2, wallH/2, 0], size: [wallT, wallH, mapD + wallT*2] },
+      { pos: [ halfW + wallT/2, wallH/2, 0], size: [wallT, wallH, mapD + wallT*2] },
+    ].forEach(w => {
+      const body = new CANNON.Body({ mass: 0 });
+      body.collisionFilterGroup = 8;
+      body.collisionFilterMask  = 1 | 4 | 8;
+      body.addShape(new CANNON.Box(new CANNON.Vec3(w.size[0]/2, w.size[1]/2, w.size[2]/2)));
+      body.position.set(...w.pos);
+      this.physicsWorld.addBody(body);
+    });
+
+    // Snow — built from tile map
+    this._addSnowFromMap(mapData);
+  }
+
+  _addSnowFromMap(mapData) {
+    const CELL = mapData.tileSize || 1.5;
+    const COLS = mapData.cols || 100;
+    const ROWS = mapData.rows || 100;
+    const tileStr = mapData.tiles || '';
+    const originX = -(COLS / 2) * CELL;
+    const originZ = -(ROWS / 2) * CELL;
+
+    this._snowGrid = { CELL, COLS, ROWS, originX, originZ };
+
+    // Score zones — one per unique driveway/parking zone
+    // We assign zone IDs by connectivity: flood-fill connected D/P tiles
+    const zoneMap = new Int32Array(COLS * ROWS).fill(-1);
+    let nextZone = 1;
+    const SCORE_TYPES = new Set(['D', 'P']);
+
+    function floodFill(startCol, startRow, zoneId) {
+      const stack = [[startCol, startRow]];
+      while (stack.length) {
+        const [c, r] = stack.pop();
+        if (c < 0 || c >= COLS || r < 0 || r >= ROWS) continue;
+        const idx = r * COLS + c;
+        if (zoneMap[idx] !== -1) continue;
+        const ch = tileStr[idx] || 'G';
+        if (!SCORE_TYPES.has(ch)) continue;
+        zoneMap[idx] = zoneId;
+        stack.push([c+1,r],[c-1,r],[c,r+1],[c,r-1]);
+      }
+    }
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const ch = tileStr[r * COLS + c] || 'G';
+        if (SCORE_TYPES.has(ch) && zoneMap[r * COLS + c] === -1) {
+          floodFill(c, r, nextZone++);
+        }
+      }
+    }
+    this._numScoreZones = nextZone - 1;
+
+    const height = new Float32Array(COLS * ROWS);
+    const weight = new Float32Array(COLS * ROWS).fill(1.0);
+    const type   = new Uint8Array(COLS * ROWS);  // 0=none/grass, 1=grass, 2=road/sidewalk, 3+=score zones
+    const zone   = new Int32Array(COLS * ROWS).fill(-1);
+
+    const spawn = mapData.spawnPoint || { col: Math.floor(COLS/2), row: Math.floor(ROWS/2) };
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const idx = r * COLS + c;
+        const ch = tileStr[idx] || 'G';
+
+        // Skip house footprints and spawn area
+        if (ch === 'H') continue;
+        const dc = c - spawn.col, dr = r - spawn.row;
+        if (dc*dc + dr*dr < 9) continue; // small clear zone around spawn
+
+        if (ch === 'G') {
+          height[idx] = 0.55 + Math.random() * 0.2;
+          weight[idx] = 1.0;
+          type[idx]   = 1;
+        } else if (ch === 'R' || ch === 'S') {
+          height[idx] = 0.25 + Math.random() * 0.1;
+          weight[idx] = 3.0 + Math.random() * 1.0;
+          type[idx]   = 2;
+        } else if (ch === 'D' || ch === 'P') {
+          height[idx] = 0.3 + Math.random() * 0.1;
+          weight[idx] = 3.5 + Math.random() * 1.0;
+          type[idx]   = 3 + (zoneMap[idx] - 1); // zone offset
+          zone[idx]   = zoneMap[idx];
+        }
+      }
+    }
+
+    this._snowGrid.height = height;
+    this._snowGrid.weight = weight;
+    this._snowGrid.type   = type;
+    this._snowGrid.zone   = zone;
+    this._snowGrid.numZones = this._numScoreZones;
+
+    const bodies = new Array(COLS * ROWS).fill(null);
+    this._snowGrid.bodies = bodies;
+    const meshes = new Array(COLS * ROWS).fill(null);
+
+    for (let iz = 0; iz < ROWS; iz++) {
+      for (let ix = 0; ix < COLS; ix++) {
+        const idx = iz * COLS + ix;
+        if (height[idx] === 0) continue;
+        const wx = originX + (ix + 0.5) * CELL;
+        const wz = originZ + (iz + 0.5) * CELL;
+        const geo = new THREE.BoxGeometry(CELL, 1, CELL);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xddeeff });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(wx, 0, wz);
+        this._updateSnowMesh(mesh, height[idx], weight[idx], type[idx]);
+        this.scene.add(mesh);
+        meshes[idx] = mesh;
+      }
+    }
+    this._snowGrid.meshes = meshes;
+  }
+
+
+  _addScenery() {
+    // Houses — positions match tile pad centers
+    this._addHouse(25, -34);   // house 1 — east, far south, large
+    this._addHouse(13,  10);   // house 2 — east, mid, small
+    this._addHouse(-26,  25);  // house 3 — west, far north
+
+    // Snow layer across the ground
+    this._addSnow();
+  }
+
+  _addHouse(x, z, W = 8, D = 6) {
+    // Simple low-poly house: walls + roof
+    const mWall = matcapMat('white');
+    const mRoof = matcapMat('red');
+    const mWin  = matcapMat('glass');
+    const mDoor = matcapMat('dark');
+    const mTrim = matcapMat('chrome');
+
+    const wallH = 3.5;
+
+    // Main walls (box)
+    const walls = new THREE.Mesh(new THREE.BoxGeometry(W, wallH, D), mWall);
+    walls.position.set(x, wallH / 2, z);
+    this.scene.add(walls);
+
+    // Roof — triangular prism via BufferGeometry
+    const hw = W / 2, ridgeH = 2.5, hd = D / 2;
+    const roofVerts = new Float32Array([
+      // front face
+      -hw, 0,  hd,   hw, 0,  hd,   0, ridgeH,  hd,
+      // back face
+      -hw, 0, -hd,   0, ridgeH, -hd,   hw, 0, -hd,
+      // left slope
+      -hw, 0,  hd,   0, ridgeH,  hd,   0, ridgeH, -hd,
+      -hw, 0,  hd,   0, ridgeH, -hd,  -hw, 0, -hd,
+      // right slope
+       hw, 0,  hd,   hw, 0, -hd,   0, ridgeH, -hd,
+       hw, 0,  hd,   0, ridgeH, -hd,   0, ridgeH,  hd,
+    ]);
+    const roofGeo = new THREE.BufferGeometry();
+    roofGeo.setAttribute('position', new THREE.BufferAttribute(roofVerts, 3));
+    roofGeo.computeVertexNormals();
+    const roof = new THREE.Mesh(roofGeo, mRoof);
+    roof.position.set(x, wallH, z);
+    this.scene.add(roof);
+
+    // Windows (front face)
+    [[-2, 0], [2, 0]].forEach(([ox, oz]) => {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 0.1), mWin);
+      win.position.set(x + ox, wallH * 0.6, z + D / 2 + 0.05);
+      this.scene.add(win);
+    });
+
+    // Door
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 0.1), mDoor);
+    door.position.set(x, 1.1, z + D / 2 + 0.05);
+    this.scene.add(door);
+
+    // Chimney
+    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.0, 0.9), mWall);
+    chimney.position.set(x + W * 0.25, wallH + 1.0, z - D * 0.1);
+    this.scene.add(chimney);
+
+    const chimneyTop = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.2, 1.1), mTrim);
+    chimneyTop.position.set(x + W * 0.25, wallH + 2.1, z - D * 0.1);
+    this.scene.add(chimneyTop);
+
+    // Physics — static box for walls
+    const body = new CANNON.Body({ mass: 0 });
+    body.collisionFilterGroup = 8;
+    body.collisionFilterMask  = 1 | 4 | 8;
+    body.addShape(new CANNON.Box(new CANNON.Vec3(W/2, wallH/2, D/2)));
+    body.position.set(x, wallH/2, z);
+    this.physicsWorld.addBody(body);
+  }
+
+
+
+  _addSnow() {
+    const CELL  = 1.5;
+    const COLS  = 52;
+    const ROWS  = 76;
+    this._snowGrid = { CELL, COLS, ROWS,
+      originX: -(COLS / 2) * CELL,
+      originZ: -(ROWS / 2) * CELL,
+    };
+
+    const height  = new Float32Array(COLS * ROWS);
+    const weight  = new Float32Array(COLS * ROWS).fill(1.0);
+    // type: 0=none, 1=grass snow, 2=road/driveway snow
+    const type    = new Uint8Array(COLS * ROWS);
+
+    for (let ix = 0; ix < COLS; ix++) {
+      for (let iz = 0; iz < ROWS; iz++) {
+        const wx = this._snowGrid.originX + (ix + 0.5) * CELL;
+        const wz = this._snowGrid.originZ + (iz + 0.5) * CELL;
+        if (Math.abs(wx) > 37 || Math.abs(wz) > 55) continue;
+        if (Math.abs(wx) < 4 && Math.abs(wz) < 6) continue;   // spawn zone
+        if (wx > 18 && wx < 30 && wz > -42 && wz < -30) continue; // house 1
+        if (wx >  9 && wx < 18 && wz >   6 && wz <  15) continue; // house 2
+        if (wx > -31 && wx < -21 && wz > 21 && wz < 31) continue; // house 3
+
+        const idx = iz * COLS + ix;
+        const onRoad  = wx > -3 && wx < 3;
+        const onDrive1 = wx > 3  && wx < 27 && wz > -37 && wz < -27;
+        const onDrive2 = wx > 3  && wx < 13 && wz >   7 && wz <  13;
+        const onDrive3 = wx > -28 && wx < -3 && wz > 22 && wz <  31;
+
+        if (onRoad || onDrive1 || onDrive2 || onDrive3) {
+          height[idx] = 0.3 + Math.random() * 0.1;
+          weight[idx] = 3.0 + Math.random() * 1.0;
+          // zone: 1=road, 2=house1, 3=house2, 4=house3
+          type[idx] = onDrive1 ? 2 : onDrive2 ? 3 : onDrive3 ? 4 : 1;
+        } else {
+          height[idx] = 0.55 + Math.random() * 0.2;
+          weight[idx] = 1.0;
+          type[idx]   = 0; // grass
+        }
+      }
+    }
+
+    this._snowGrid.height = height;
+    this._snowGrid.weight = weight;
+    this._snowGrid.type   = type;
+
+    const bodies = new Array(COLS * ROWS).fill(null);
+    this._snowGrid.bodies = bodies;
+
+    const meshes = new Array(COLS * ROWS).fill(null);
+
+    for (let iz = 0; iz < ROWS; iz++) {
+      for (let ix = 0; ix < COLS; ix++) {
+        const idx = iz * COLS + ix;
+        if (height[idx] === 0) continue;
+        const wx = this._snowGrid.originX + (ix + 0.5) * CELL;
+        const wz = this._snowGrid.originZ + (iz + 0.5) * CELL;
+        const geo = new THREE.BoxGeometry(CELL, 1, CELL);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xddeeff });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(wx, 0, wz);
+        this._updateSnowMesh(mesh, height[idx], weight[idx], type[idx]);
+        this.scene.add(mesh);
+        meshes[idx] = mesh;
+      }
+    }
+    this._snowGrid.meshes = meshes;
+  }
+
+  _createSnowMesh(wx, wz) {
+    const { CELL } = this._snowGrid;
+    const geo = new THREE.BoxGeometry(CELL, 1, CELL);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xddeeff });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(wx, 0, wz);
+    this.scene.add(mesh);
+    return mesh;
+  }
+
+  _updateSnowMesh(mesh, h, w = 1, snowType = 0) {
+    const maxH = 0.85;
+    const visH = Math.max(0, h) * maxH;
+    mesh.scale.y = Math.max(0.001, visH);
+    mesh.position.y = visH / 2;
+    const t = Math.min(1, (w - 1) / 4.0);
+    if (snowType >= 1) {
+      // Road/driveway snow — slightly grey, compacted
+      mesh.material.color.setRGB(
+        0.82 - t * 0.15,
+        0.85 - t * 0.10,
+        0.88 - t * 0.05
+      );
+    } else {
+      // Grass snow — bright white with blue tint when packed
+      mesh.material.color.setRGB(
+        0.92 - t * 0.35,
+        0.95 - t * 0.20,
+        1.00 - t * 0.05
+      );
+    }
+    mesh.visible = h > 0.02;
+  }
+
+  _updateSnow(plowWorldPos, plowWorldQuat, plowSpeed, dt, prevPlowPos) {
+    if (!this._snowGrid || !plowWorldPos) return 0;
+    const { CELL, COLS, ROWS, originX, originZ, height, weight, meshes, bodies, type } = this._snowGrid;
+
+    if (plowSpeed < 0.05) return 0;
+
+    const MAX_HEIGHT = 1.6;
+    const bladeHalfW = 1.8; // wider than visual blade to guarantee full cell coverage
+
+    const fwd   = new THREE.Vector3(0, 0, -1).applyQuaternion(plowWorldQuat);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(plowWorldQuat);
+    fwd.y = 0;   fwd.normalize();
+    right.y = 0; right.normalize();
+
+    const curX = plowWorldPos.x, curZ = plowWorldPos.z;
+    const prvX = prevPlowPos ? prevPlowPos.x : curX - fwd.x * 0.01;
+    const prvZ = prevPlowPos ? prevPlowPos.z : curZ - fwd.z * 0.01;
+
+    const travelX = curX - prvX, travelZ = curZ - prvZ;
+    const travelDist = Math.sqrt(travelX*travelX + travelZ*travelZ);
+
+    const searchR = Math.ceil((bladeHalfW + travelDist + CELL) / CELL) + 2;
+    const midX = (prvX + curX) * 0.5, midZ = (prvZ + curZ) * 0.5;
+    const cx = Math.round((midX - originX) / CELL);
+    const cz = Math.round((midZ - originZ) / CELL);
+
+    function inSweptArea(wx, wz) {
+      const dxR = wx - prvX, dzR = wz - prvZ;
+      const localRight = dxR * right.x + dzR * right.z;
+      if (Math.abs(localRight) > bladeHalfW) return false;
+      const localFwd = dxR * fwd.x + dzR * fwd.z;
+      return localFwd >= -CELL * 0.5 && localFwd <= travelDist + CELL * 0.5;
+    }
+
+    const dirty = new Set();
+    let totalPushedWeight = 0;
+
+    const deposit = (snow, wx, wz) => {
+      let nix = Math.floor((wx + fwd.x * CELL - originX) / CELL);
+      let niz = Math.floor((wz + fwd.z * CELL - originZ) / CELL);
+      nix = Math.max(0, Math.min(COLS - 1, nix));
+      niz = Math.max(0, Math.min(ROWS - 1, niz));
+      const nidx = niz * COLS + nix;
+      if (height[nidx] >= MAX_HEIGHT) {
+        weight[nidx] += snow * 1.5;
+      } else {
+        height[nidx] = Math.min(height[nidx] + snow, MAX_HEIGHT);
+        weight[nidx] += snow * 1.5;
+      }
+      if (!meshes[nidx]) meshes[nidx] = this._createSnowMesh(
+        originX + (nix + 0.5) * CELL, originZ + (niz + 0.5) * CELL
+      );
+      dirty.add(nidx);
+    };
+
+    for (let dix = -searchR; dix <= searchR; dix++) {
+      for (let diz = -searchR; diz <= searchR; diz++) {
+        const ix = cx + dix;
+        const iz = cz + diz;
+        if (ix < 0 || ix >= COLS || iz < 0 || iz >= ROWS) continue;
+        const idx = iz * COLS + ix;
+        if (height[idx] < 0.01) continue;
+
+        const wx = originX + (ix + 0.5) * CELL;
+        const wz = originZ + (iz + 0.5) * CELL;
+
+        if (!inSweptArea(wx, wz)) continue;
+
+        // Scoop the full cell height in one pass — if the blade reaches it, clear it.
+        // Resistance still affects snow drag on the vehicle, but not visual clearing.
+        const scooped = height[idx];
+        height[idx] = 0;
+        totalPushedWeight += weight[idx];
+        dirty.add(idx);
+
+        deposit(scooped, wx, wz);
+      }
+    }
+
+    if (plowSpeed < 0.3) {
+      const chassisX = plowWorldPos.x - fwd.x * 2.5;
+      const chassisZ = plowWorldPos.z - fwd.z * 2.5;
+      const tcx = Math.floor((chassisX - originX) / CELL);
+      const tcz = Math.floor((chassisZ - originZ) / CELL);
+
+      for (let dix = -searchR; dix <= searchR; dix++) {
+        for (let diz = -searchR; diz <= searchR; diz++) {
+          const ix = cx + dix;
+          const iz = cz + diz;
+          if (ix < 0 || ix >= COLS || iz < 0 || iz >= ROWS) continue;
+          const idx = iz * COLS + ix;
+          if (height[idx] < MAX_HEIGHT || bodies[idx]) continue;
+          if (Math.abs(ix - tcx) <= 2 && Math.abs(iz - tcz) <= 2) continue;
+
+          const wx = originX + (ix + 0.5) * CELL;
+          const wz = originZ + (iz + 0.5) * CELL;
+          const physHalfH = 0.3;
+          const body = new CANNON.Body({ mass: 60 });
+          body.collisionFilterGroup = 16;
+          body.collisionFilterMask  = 1 | 16;
+          body.linearDamping  = 0.3;
+          body.angularDamping = 0.6;
+          body.material = new CANNON.Material({ restitution: 0.2, friction: 0.1 });
+          body.addShape(new CANNON.Box(new CANNON.Vec3(CELL / 2, physHalfH, CELL / 2)));
+          body.position.set(wx, physHalfH, wz);
+          body.allowSleep = true;
+          body.sleepSpeedLimit = 0.5;
+          body.sleepTimeLimit  = 1.5;
+          this.physicsWorld.addBody(body);
+          bodies[idx] = body;
+          dirty.add(idx);
+        }
+      }
+    }
+
+    dirty.forEach(idx => {
+      if (meshes[idx]) this._updateSnowMesh(meshes[idx], height[idx], weight[idx], type ? type[idx] : 1);
+    });
+
+    // Compute clearing scores — throttle to every 10 frames
+    this._scoreTick = (this._scoreTick || 0) + 1;
+    if (this._scoreTick % 10 === 0) {
+      const CLEAR = 0.05;
+      const totals  = [0, 0, 0, 0, 0]; // zones 0..4
+      const cleared = [0, 0, 0, 0, 0];
+      for (let i = 0; i < height.length; i++) {
+        const z = type ? type[i] : 0;
+        if (z === 0) continue; // grass — skip
+        totals[z]++;
+        if (height[i] < CLEAR) cleared[z]++;
+      }
+      this._scores = {
+        road:   totals[1] ? cleared[1] / totals[1] : 0,
+        house1: totals[2] ? cleared[2] / totals[2] : 0,
+        house2: totals[3] ? cleared[3] / totals[3] : 0,
+        house3: totals[4] ? cleared[4] / totals[4] : 0,
+        total:  (totals[1]+totals[2]+totals[3]+totals[4]) ?
+                (cleared[1]+cleared[2]+cleared[3]+cleared[4]) /
+                (totals[1]+totals[2]+totals[3]+totals[4]) : 0,
+      };
+    }
+
+    return totalPushedWeight;
+  }
+
+
+  update(plowPos, plowQuat, plowSpeed, dt) {
+    if (this._bumpables) {
+      this._bumpables.forEach(({ mesh, shadowMesh, body }) => {
+        mesh.position.copy(body.position);
+        mesh.quaternion.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w);
+
+        shadowMesh.position.set(body.position.x, 0.004, body.position.z);
+        const h = Math.max(0, body.position.y - 0.5);
+        const s = Math.max(0, 1 - h * 0.2);
+        shadowMesh.scale.setScalar(s);
+        shadowMesh.material.opacity = 0.12 * s;
+      });
+    }
+
+    const drag = this._updateSnow(plowPos, plowQuat, plowSpeed, dt, this._prevPlowPos);
+    this._prevPlowPos = plowPos ? { x: plowPos.x, y: plowPos.y, z: plowPos.z } : null;
+    this._lastSnowDrag = drag ?? 0;
+  }
+}
+
+// ============================================================
+// VIEW — Chase camera with easing (communicates speed feel)
+// ============================================================
+class View {
+  constructor(camera) {
+    this.camera = camera;
+    this._pos  = new THREE.Vector3(0, 10, 20);
+    this._look = new THREE.Vector3(0, 0, 0);
+    this._tmpPos  = new THREE.Vector3();
+    this._tmpLook = new THREE.Vector3();
+  }
+
+  update(physVehicle, dt) {
+    const chassis = physVehicle.chassisBody;
+    const speed   = Math.abs(physVehicle.speed);
+
+    // Camera sits behind and above — in local chassis space
+    const offset = new THREE.Vector3(0, 7, 17);
+    const q = new THREE.Quaternion(
+      chassis.quaternion.x, chassis.quaternion.y,
+      chassis.quaternion.z, chassis.quaternion.w
+    );
+    offset.applyQuaternion(q);
+
+    this._tmpPos.set(
+      chassis.position.x + offset.x,
+      Math.max(4, chassis.position.y + offset.y),
+      chassis.position.z + offset.z
+    );
+
+    // Look ahead — in front of the truck (negative Z = forward in truck-local space)
+    const lookAhead = new THREE.Vector3(0, 0, -(4 + speed * 0.18));
+    lookAhead.applyQuaternion(q);
+    this._tmpLook.set(
+      chassis.position.x + lookAhead.x,
+      chassis.position.y + lookAhead.y + 1,
+      chassis.position.z + lookAhead.z
+    );
+
+    // Easing — slower lerp creates the "floating" feel Bruno describes
+    const ease = Math.min(dt * 4.5, 1);
+    const lookEase = Math.min(dt * 7, 1);
+    this._pos.lerp(this._tmpPos, ease);
+    this._look.lerp(this._tmpLook, lookEase);
+
+    this.camera.position.copy(this._pos);
+    this.camera.lookAt(this._look);
+  }
+}
+
+// ============================================================
+// RENDERER + SCENE SETUP
+// ============================================================
+function setupScene() {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xe8f4f8); // snowy sky
+  scene.fog = new THREE.Fog(0xe8f4f8, 60, 180);
+
+  const camera = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, 0.1, 300);
+  camera.position.set(0, 8, -14);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  // No shadows needed — we use blob shadows (Bruno's technique)
+  document.body.appendChild(renderer.domElement);
+
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  return { scene, camera, renderer };
+}
+
+// ============================================================
+// PHYSICS WORLD SETUP
+// ============================================================
+function setupPhysics() {
+  const world = new CANNON.World();
+  world.gravity.set(0, -22, 0); // Slightly higher gravity feels snappier
+  world.broadphase = new CANNON.SAPBroadphase(world);
+  world.solver.iterations = 10;
+  world.allowSleep = true;
+  return world;
+}
+
+// ============================================================
+// MAIN — Load, init, loop
+// ============================================================
+async function main() {
+  const loaderEl = document.getElementById('loader');
+  const barEl    = document.getElementById('loader-bar');
+  const startBtn = document.getElementById('start-btn');
+
+  // Simulate loading progress (building matcaps, scene)
+  const progress = (p) => { barEl.style.width = p + '%'; };
+
+  progress(10);
+  buildMatcaps();
+  progress(40);
+
+  // ── LOAD map.json if available ───────────────────────────────
+  let mapData = null;
+  try {
+    const mapRes = await fetch('map.json');
+    if (mapRes.ok) {
+      mapData = await mapRes.json();
+      console.log(`Loaded map.json: ${mapData.cols}×${mapData.rows} tiles, ${(mapData.buildings||[]).length} buildings`);
+    }
+  } catch(e) {
+    // No map.json — use procedural neighbourhood
+  }
+
+  // ── LOAD vehicles.json if available ─────────────────────────
+  // Tries to fetch vehicles.json from the same folder.
+  // If found, builds the VEHICLES array from it.
+  // If not found, falls back to the hardcoded VEHICLES array above.
+  try {
+    const res = await fetch('vehicles.json');
+    if (res.ok) {
+      const data = await res.json();
+      // Clear and rebuild VEHICLES from JSON
+      VEHICLES.length = 0;
+      data.forEach(v => {
+        VEHICLES.push({
+          name: v.name,
+          description: v.description || '',
+          physics: { ...v.physics || {}, wheels: v.wheels || null },
+          build(bodyGroup, scene, wheelGroups) {
+            const body = bodyGroup;
+            const box = (w,h,d,mat) => new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+            const cyl = (rt,rb,h,s,mat) => new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,s), mat);
+            (v.parts || []).forEach(part => {
+              const mat = matcapMat(part.mat || 'blue');
+              let mesh;
+              if (part.type === 'box') {
+                mesh = box(part.w, part.h, part.d, mat);
+              } else if (part.type === 'cylinder') {
+                mesh = cyl(part.r, part.r, part.ch, 16, mat);
+                if (part.axis === 'x') mesh.rotation.z = Math.PI / 2;
+                else if (part.axis === 'z') mesh.rotation.x = Math.PI / 2;
+              } else return;
+              mesh.position.set(part.px || 0, part.py || 0, part.pz || 0);
+              if (part.rx) mesh.rotation.x += part.rx;
+              if (part.ry) mesh.rotation.y += part.ry;
+              if (part.rz) mesh.rotation.z += part.rz;
+              body.add(mesh);
+            });
+            // Standard wheel groups
+            for (let i = 0; i < 4; i++) {
+              const wg = new THREE.Group(); scene.add(wg);
+              const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.34,18), matcapMat('rubber'));
+              tire.rotation.z = Math.PI/2; wg.add(tire);
+              const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,0.35,10), matcapMat('white'));
+              rim.rotation.z = Math.PI/2; wg.add(rim);
+              for (let s=0;s<5;s++) {
+                const sp = new THREE.Mesh(new THREE.BoxGeometry(0.36,0.06,0.06), matcapMat('dark'));
+                sp.rotation.x = (s/5)*Math.PI*2; wg.add(sp);
+              }
+              wheelGroups.push(wg);
+            }
+          }
+        });
+      });
+      console.log(`Loaded ${VEHICLES.length} vehicle(s) from vehicles.json`);
+    }
+  } catch(e) {
+    // No vehicles.json — use hardcoded VEHICLES array (normal when no file present)
+  }
+
+  const { scene, camera, renderer } = setupScene();
+  const physicsWorld = setupPhysics();
+
+  progress(60);
+
+  const time    = new Time();
+  const inputs  = new Inputs();
+
+  // ── VEHICLE SELECTION ───────────────────────────────────────
+  const selScreen = document.getElementById('vehicle-select-screen');
+  const selCards  = document.getElementById('vsel-cards');
+  let selectedVehicleIdx = 0;
+
+  function renderVehicleCards() {
+    selCards.innerHTML = '';
+    VEHICLES.forEach((v, i) => {
+      const cfg = v.physics || {};
+      const card = document.createElement('div');
+      card.className = 'vsel-card' + (i === selectedVehicleIdx ? ' selected' : '');
+
+      // Stat bars mapped to intuitive values
+      const topSpeed     = cfg.topSpeed     || 14;
+      const engineForce  = cfg.engineForce  || 1800;
+      const mass         = cfg.mass         || 150;
+      const brakeForce   = cfg.brakeForce   || 80;
+      const steerAngle   = cfg.maxSteerAngle || 0.52;
+
+      const statSpeed    = Math.min(100, Math.round((topSpeed / 25) * 100));
+      const statAccel    = Math.min(100, Math.round((engineForce / mass / 12 / 10) * 100));
+      const statBraking  = Math.min(100, Math.round((brakeForce / 180) * 100));
+      const statTurning  = Math.min(100, Math.round(((steerAngle - 0.18) / (0.72)) * 100));
+
+      card.innerHTML = `
+        <div class="vsel-card-name">${v.name}</div>
+        <div class="vsel-card-desc">${v.description || ''}</div>
+        ${[
+          ['Top Speed',    statSpeed],
+          ['Acceleration', statAccel],
+          ['Braking',      statBraking],
+          ['Turning',      statTurning],
+        ].map(([label, val]) =>
+          `<div class="vsel-stat">
+            <div class="vsel-stat-label">${label}</div>
+            <div class="vsel-stat-bar"><div class="vsel-stat-fill" style="width:${val}%"></div></div>
+          </div>`
+        ).join('')}
+      `;
+      card.onclick = () => { selectedVehicleIdx = i; renderVehicleCards(); };
+      selCards.appendChild(card);
+    });
+  }
+
+  renderVehicleCards();
+
+  // Hide the loader so the vehicle select screen is visible
+  loaderEl.classList.add('hidden');
+  setTimeout(() => { loaderEl.style.display = 'none'; }, 500);
+
+  // Wait for vehicle selection
+  await new Promise(resolve => {
+    document.getElementById('vsel-confirm').addEventListener('click', resolve, { once: true });
+  });
+  selScreen.classList.add('hidden');
+  setTimeout(() => selScreen.style.display = 'none', 600);
+
+  const chosenVehicle = VEHICLES[selectedVehicleIdx];
+
+  // Briefly show loader while building the world
+  loaderEl.style.display = 'flex';
+  loaderEl.classList.remove('hidden');
+  progress(20);
+  const world   = new World(scene, physicsWorld, mapData);
+  const phys    = new PhysicalVehicle(physicsWorld, chosenVehicle.physics);
+  const visual  = new VisualVehicle(scene, chosenVehicle);
+  const view    = new View(camera);
+
+  // Apply spawn point from map.json if loaded
+  if (mapData && mapData.spawnPoint) {
+    const CELL = mapData.tileSize || 1.5;
+    const COLS = mapData.cols || 100;
+    const ROWS = mapData.rows || 100;
+    const originX = -(COLS / 2) * CELL;
+    const originZ = -(ROWS / 2) * CELL;
+    const sp = mapData.spawnPoint;
+    const sx = originX + (sp.col + 0.5) * CELL;
+    const sz = originZ + (sp.row + 0.5) * CELL;
+    phys.chassisBody.position.set(sx, 2.5, sz);
+    if (sp.angle) {
+      phys.chassisBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), sp.angle);
+    }
+  }
+
+  progress(100);
+
+  // Wait for user click (Bruno's approach: required for audio context + polish)
+  startBtn.style.display = 'block';
+  await new Promise(resolve => startBtn.addEventListener('click', resolve, { once: true }));
+
+  loaderEl.classList.add('hidden');
+  setTimeout(() => { loaderEl.style.display = 'none'; }, 900);
+  document.getElementById('score-hud').style.display = 'block';
+
+  // Score HUD helpers
+  const _scoreCompleted = {};
+  function updateScoreBar(key, ratio) {
+    const pct = Math.round(ratio * 100);
+    const fill = document.getElementById('sb-' + key);
+    const label = document.getElementById('sp-' + key);
+    const row = document.getElementById('sr-' + key);
+    fill.style.width = pct + '%';
+    label.textContent = pct + '%';
+    if (pct >= 100 && !_scoreCompleted[key]) {
+      _scoreCompleted[key] = true;
+      fill.classList.add('complete', 'just-completed');
+      row.classList.add('complete');
+      setTimeout(() => fill.classList.remove('just-completed'), 1400);
+    }
+  }
+
+  // ── GAME LOOP ─────────────────────────────────────────────
+  // Mirrors folio-2025 ordering:
+  // 0: Time, Inputs
+  // 1: PhysicalVehicle pre-physics (inputs → forces)
+  // 2: Physics step
+  // 3: PhysicalVehicle post-physics (sync wheel transforms)
+  // 4: VisualVehicle (sync meshes)
+  // 5: World objects (sync bumpables)
+  // 6: View (camera)
+  // 7: Render
+
+  const fixedStep = 1 / 60;
+  const maxSubSteps = 3;
+
+  function tick() {
+    requestAnimationFrame(tick);
+
+    // 0
+    time.tick();
+    const dt = time.delta;
+    inputs.update();
+
+    // 1–2: Physics
+    phys.update(inputs, dt);
+    physicsWorld.step(fixedStep, dt, maxSubSteps);
+
+    // 3–4: Sync visuals
+    visual.update(phys, dt);
+    // Pass plow world position for snow displacement
+    const plowPos = new THREE.Vector3(
+      phys.plowBody.position.x,
+      phys.plowBody.position.y,
+      phys.plowBody.position.z
+    );
+    const plowQuat = new THREE.Quaternion(
+      phys.plowBody.quaternion.x, phys.plowBody.quaternion.y,
+      phys.plowBody.quaternion.z, phys.plowBody.quaternion.w
+    );
+    world.update(plowPos, plowQuat, Math.abs(phys.speed), dt);
+    phys.snowDrag = world._lastSnowDrag ?? 0;
+
+    // Update score HUD
+    if (world._scores) {
+      const s = world._scores;
+      updateScoreBar('house1', s.house1);
+      updateScoreBar('house2', s.house2);
+      updateScoreBar('house3', s.house3);
+      updateScoreBar('road',   s.road);
+      document.getElementById('sb-total').style.width = (s.total * 100).toFixed(1) + '%';
+      document.getElementById('sp-total').textContent = Math.round(s.total * 100) + '%';
+    }
+
+    // 5: Camera
+    view.update(phys, dt);
+
+    // 6: Render (no postprocess yet — keeping it clean for this phase)
+    renderer.render(scene, camera);
+  }
+
+  tick();
+
+  // Reset button — clears inputs and respawns truck
+  const resetBtn = document.getElementById('reset-btn');
+  resetBtn.style.display = 'block';
+  resetBtn.addEventListener('click', () => {
+    window.location.reload();
+  });
+}
+
+main();
+</script>
+</body>
+</html>

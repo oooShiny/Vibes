@@ -1,0 +1,1772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vehicle Builder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #c8c7c0; color: #e0e0e0; font-family: 'Courier New', monospace; overflow: hidden; }
+
+  #app { display: flex; height: 100vh; }
+
+  /* ── VIEWPORT ── */
+  #viewport { flex: 1; position: relative; }
+  #viewport canvas { display: block; }
+
+  #view-label {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; letter-spacing: 0.2em; color: rgba(255,255,255,0.2);
+    text-transform: uppercase; pointer-events: none;
+  }
+  #axes {
+    position: absolute; bottom: 12px; left: 12px;
+    font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 0.1em;
+  }
+  #axes span { display: block; }
+  #axes .ax { color: #e74c3c; }
+  #axes .ay { color: #2ecc71; }
+  #axes .az { color: #3498db; }
+
+  /* ── PANEL ── */
+  #panel {
+    width: 320px; flex-shrink: 0;
+    background: #141414;
+    border-left: 1px solid #222;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  #panel-header {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid #222;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  #panel-header h1 { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: #fff; }
+  #panel-header span { font-size: 9px; color: #555; letter-spacing: 0.1em; }
+
+  /* Parts list */
+  #parts-list {
+    flex: 1; overflow-y: auto; padding: 8px 0;
+  }
+  #parts-list::-webkit-scrollbar { width: 3px; }
+  #parts-list::-webkit-scrollbar-track { background: transparent; }
+  #parts-list::-webkit-scrollbar-thumb { background: #333; }
+
+  .part-item {
+    padding: 7px 14px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    border-left: 2px solid transparent;
+    transition: background 0.1s;
+    user-select: none;
+  }
+  .part-item:hover { background: #1a1a1a; }
+  .part-item.selected { background: #1c1c1c; border-left-color: #3498db; }
+  .part-item .dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .part-item .part-name { font-size: 10px; letter-spacing: 0.08em; color: #ccc; flex: 1; }
+  .part-item .part-type { font-size: 9px; color: #444; }
+  .part-item .del-btn {
+    font-size: 11px; color: #333; cursor: pointer; padding: 2px 4px;
+    border: none; background: none; transition: color 0.1s;
+  }
+  .part-item:hover .del-btn { color: #666; }
+  .part-item .del-btn:hover { color: #e74c3c !important; }
+
+  /* Add part controls */
+  #add-bar {
+    padding: 10px 14px;
+    border-top: 1px solid #1e1e1e;
+    display: flex; gap: 6px;
+  }
+  #add-bar select, #add-bar button {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    background: #1a1a1a; color: #aaa;
+    border: 1px solid #2a2a2a; border-radius: 3px;
+    padding: 5px 8px; cursor: pointer;
+  }
+  #add-bar button { color: #fff; background: #1d3a5c; border-color: #2a5a8a; }
+  #add-bar button:hover { background: #2a5a8a; }
+  #add-bar select { flex: 1; }
+
+  /* Inspector */
+  #inspector {
+    border-top: 1px solid #222;
+    padding: 12px 14px 14px;
+    max-height: 340px; overflow-y: auto;
+  }
+  #inspector::-webkit-scrollbar { width: 3px; }
+  #inspector::-webkit-scrollbar-thumb { background: #333; }
+
+  #inspector-title {
+    font-size: 9px; letter-spacing: 0.18em; color: #777; text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .insp-section { margin-bottom: 12px; }
+  .insp-section-label {
+    font-size: 9px; letter-spacing: 0.12em; color: #666; text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .insp-row {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 5px;
+  }
+  .insp-row label {
+    font-size: 10px; color: #999; width: 22px; flex-shrink: 0; letter-spacing: 0.02em;
+  }
+  .insp-row input[type=range] {
+    flex: 1; height: 2px; accent-color: #3498db; cursor: pointer;
+  }
+  .insp-row .val {
+    font-size: 9px; color: #3498db; width: 36px; text-align: right;
+  }
+  .insp-row input[type=text] {
+    flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 2px;
+    color: #ccc; font-family: 'Courier New', monospace; font-size: 10px;
+    padding: 3px 6px;
+  }
+  .color-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  .color-swatch {
+    width: 20px; height: 20px; border-radius: 3px; cursor: pointer;
+    border: 2px solid transparent; transition: border-color 0.1s;
+  }
+  .color-swatch.active { border-color: #fff; }
+  #no-selection {
+    font-size: 10px; color: #666; letter-spacing: 0.08em;
+  }
+
+  /* Bottom actions */
+  #actions {
+    padding: 10px 14px;
+    border-top: 1px solid #222;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  #name-row { display: flex; gap: 6px; align-items: center; }
+  #name-row label { font-size: 9px; color: #888; letter-spacing: 0.1em; }
+  #vehicle-name {
+    flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px;
+    color: #ccc; font-family: 'Courier New', monospace; font-size: 10px; padding: 4px 7px;
+  }
+  .action-btn {
+    font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; cursor: pointer; padding: 7px 12px;
+    border-radius: 3px; border: 1px solid #2a2a2a; background: #1a1a1a; color: #888;
+    transition: all 0.15s;
+  }
+  .action-btn:hover { background: #222; color: #ccc; }
+  .action-btn.primary { background: #1a3a1a; border-color: #2a6a2a; color: #4aaa4a; }
+  .action-btn.primary:hover { background: #2a5a2a; }
+  .action-btn.secondary { background: #1a1a3a; border-color: #2a2a6a; color: #4a4aaa; }
+  .action-btn.secondary:hover { background: #2a2a5a; }
+
+  /* Code output modal */
+  #code-modal {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  #code-modal.open { display: flex; }
+  #code-box {
+    background: #141414; border: 1px solid #2a2a2a; border-radius: 6px;
+    width: 700px; max-height: 80vh; display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  #code-header {
+    padding: 12px 16px; border-bottom: 1px solid #222;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #code-header h2 { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #fff; }
+  #code-close { background: none; border: none; color: #555; font-size: 16px; cursor: pointer; }
+  #code-close:hover { color: #fff; }
+  #code-content {
+    flex: 1; overflow: auto; padding: 16px;
+    font-size: 11px; line-height: 1.7; color: #8ab4d8;
+    background: #0d0d0d; white-space: pre; font-family: 'Courier New', monospace;
+  }
+  #code-footer {
+    padding: 10px 16px; border-top: 1px solid #222;
+    display: flex; gap: 8px; justify-content: flex-end; align-items: center;
+  }
+  #copy-status { font-size: 9px; color: #4aaa4a; letter-spacing: 0.1em; opacity: 0; transition: opacity 0.3s; }
+
+  /* Multi-select */
+  .part-item.multi-selected { background: #1a1c1e; border-left-color: #f39c12; }
+  .part-item.multi-selected .part-name { color: #f39c12; }
+  #selection-count {
+    padding: 4px 14px 2px; font-size: 9px; color: #555;
+    letter-spacing: 0.1em; display: none;
+  }
+  #selection-count.visible { display: block; }
+
+  /* Vehicles panel */
+  #vehicles-bar {
+    padding: 8px 14px; border-top: 1px solid #1e1e1e;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  #vehicles-bar-label { font-size: 9px; letter-spacing: 0.12em; color: #666; text-transform: uppercase; }
+  #vehicles-row { display: flex; gap: 5px; align-items: center; }
+  #vehicle-select {
+    flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px;
+    color: #aaa; font-family: 'Courier New', monospace; font-size: 10px; padding: 4px 6px; cursor: pointer;
+  }
+  .veh-btn {
+    font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.08em;
+    padding: 4px 8px; border-radius: 3px; border: 1px solid #2a2a2a;
+    background: #1a1a1a; color: #666; cursor: pointer; text-transform: uppercase;
+    white-space: nowrap; transition: all 0.1s;
+  }
+  .veh-btn:hover { background: #222; color: #ccc; }
+  .veh-btn.save { background: #1a2a3a; border-color: #2a4a6a; color: #5a9ad5; }
+  .veh-btn.save:hover { background: #1a3a5a; }
+  .veh-btn.del { color: #553333; }
+  .veh-btn.del:hover { background: #2a1a1a; color: #e74c3c; }
+
+  /* Part item copy button */
+  .copy-btn {
+    font-size: 11px; color: #333; cursor: pointer; padding: 2px 4px;
+    border: none; background: none; transition: color 0.1s;
+  }
+  .part-item:hover .copy-btn { color: #666; }
+  .copy-btn:hover { color: #3498db !important; }
+
+  /* Undo button */
+  #undo-btn { opacity: 0.4; cursor: default; }
+  #undo-btn.active { opacity: 1; cursor: pointer; }
+
+  /* Parts library modal */
+  #lib-modal {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  #lib-modal.open { display: flex; }
+  #lib-box {
+    background: #141414; border: 1px solid #2a2a2a; border-radius: 6px;
+    width: 560px; max-height: 75vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  #lib-header {
+    padding: 12px 16px; border-bottom: 1px solid #222;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #lib-header h2 { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #fff; }
+  #lib-close { background: none; border: none; color: #555; font-size: 16px; cursor: pointer; }
+  #lib-close:hover { color: #fff; }
+  #lib-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+  #lib-list::-webkit-scrollbar { width: 3px; }
+  #lib-list::-webkit-scrollbar-thumb { background: #333; }
+  .lib-item {
+    padding: 9px 16px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid #1a1a1a;
+  }
+  .lib-item:hover { background: #1a1a1a; }
+  .lib-item-name { font-size: 11px; color: #ccc; flex: 1; }
+  .lib-item-count { font-size: 9px; color: #444; }
+  .lib-item-btn {
+    font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.1em;
+    padding: 3px 8px; border-radius: 2px; cursor: pointer; border: 1px solid #2a2a2a;
+    background: #1a1a1a; color: #777; text-transform: uppercase; transition: all 0.1s;
+  }
+  .lib-item-btn:hover { background: #222; color: #ccc; }
+  .lib-item-btn.del { color: #553333; border-color: #3a2222; }
+  .lib-item-btn.del:hover { background: #3a1a1a; color: #e74c3c; }
+  #lib-empty { padding: 24px 16px; font-size: 10px; color: #666; letter-spacing: 0.08em; }
+  #lib-footer { padding: 10px 16px; border-top: 1px solid #222; }
+  #save-part-row { display: flex; gap: 6px; }
+  #save-part-name {
+    flex: 1; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px;
+    color: #ccc; font-family: 'Courier New', monospace; font-size: 10px; padding: 5px 7px;
+  }
+  #lib-save-hint { font-size: 9px; color: #333; margin-bottom: 7px; letter-spacing: 0.05em; }
+
+
+  /* Tabs */
+  #panel-tabs {
+    display: flex; border-bottom: 1px solid #222; flex-shrink: 0;
+  }
+  .panel-tab {
+    flex: 1; padding: 9px 0; font-size: 9px; letter-spacing: 0.14em;
+    text-transform: uppercase; text-align: center; cursor: pointer;
+    color: #777; border-bottom: 2px solid transparent;
+    transition: color 0.15s; user-select: none;
+  }
+  .panel-tab:hover { color: #888; }
+  .panel-tab.active { color: #fff; border-bottom-color: #3498db; }
+
+  /* Tab panes */
+  .tab-pane { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .tab-pane.active { display: flex; }
+
+  /* Garage */
+  #garage-list {
+    flex: 1; overflow-y: auto; padding: 8px 0;
+  }
+  #garage-list::-webkit-scrollbar { width: 3px; }
+  #garage-list::-webkit-scrollbar-thumb { background: #333; }
+  .garage-empty { padding: 24px 16px; font-size: 10px; color: #666; letter-spacing: 0.08em; }
+  .garage-card {
+    border-bottom: 1px solid #1a1a1a; cursor: pointer;
+    transition: background 0.1s;
+  }
+  .garage-card:hover { background: #191919; }
+  .garage-card.open { background: #1a1a1a; }
+  .garage-card-header {
+    padding: 9px 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .garage-card-name { font-size: 11px; color: #ccc; flex: 1; letter-spacing: 0.06em; }
+  .garage-card-chevron { font-size: 10px; color: #777; transition: transform 0.2s; }
+  .garage-card.open .garage-card-chevron { transform: rotate(90deg); }
+  .garage-card-body {
+    display: none; padding: 0 14px 12px;
+  }
+  .garage-card.open .garage-card-body { display: block; }
+  .phys-section-label {
+    font-size: 9px; letter-spacing: 0.12em; color: #666;
+    text-transform: uppercase; margin: 8px 0 5px;
+  }
+  .phys-row {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 5px;
+  }
+  .phys-row label {
+    font-size: 10px; color: #999; width: 88px; flex-shrink: 0;
+    letter-spacing: 0.02em; line-height: 1.3;
+  }
+  .phys-row input[type=range] { flex: 1; height: 2px; accent-color: #e67e22; cursor: pointer; }
+  .phys-row .pval { font-size: 11px; color: #e67e22; width: 40px; text-align: right; }
+  .phys-desc-input {
+    width: 100%; background: #111; border: 1px solid #222; border-radius: 2px;
+    color: #bbb; font-family: 'Courier New', monospace; font-size: 10px;
+    padding: 4px 6px; margin-bottom: 8px; box-sizing: border-box;
+  }
+  .garage-btns { display: flex; gap: 5px; margin-top: 10px; }
+  .garage-btn {
+    font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.1em;
+    padding: 5px 10px; border-radius: 3px; border: 1px solid #2a2a2a;
+    background: #1a1a1a; color: #777; cursor: pointer; text-transform: uppercase;
+    transition: all 0.1s; flex: 1; text-align: center;
+  }
+  .garage-btn:hover { background: #222; color: #ccc; }
+  .garage-btn.export { background: #1a3a1a; border-color: #2a6a2a; color: #4aaa4a; }
+  .garage-btn.export:hover { background: #2a5a2a; }
+  .garage-btn.del { color: #553333; }
+  .garage-btn.del:hover { background: #2a1a1a; color: #e74c3c; }
+  #garage-empty-state { padding: 30px 16px; text-align: center; font-size: 10px; color: #666; line-height: 1.8; }
+
+  /* Grid overlay hint */
+  #grid-hint {
+    position: absolute; top: 12px; right: 12px;
+    font-size: 9px; color: rgba(255,255,255,0.15);
+    letter-spacing: 0.1em; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="viewport">
+    <div id="view-label">drag to orbit · scroll to zoom</div>
+    <div id="axes">
+      <span class="ax">X → right</span>
+      <span class="ay">Y → up</span>
+      <span class="az">Z → back (negative = front)</span>
+    </div>
+    <div id="grid-hint">GRID 1 UNIT</div>
+  </div>
+
+  <div id="panel">
+    <div id="panel-header">
+      <h1>Vehicle Builder</h1>
+    </div>
+
+    <div id="panel-tabs">
+      <div class="panel-tab active" data-tab="builder">Builder</div>
+      <div class="panel-tab" data-tab="garage">Garage</div>
+    </div>
+
+    <!-- BUILDER TAB -->
+    <div class="tab-pane active" id="tab-builder" style="flex-direction:column;overflow:hidden;">
+    <div id="selection-count"></div>
+    <div id="parts-list"></div>
+
+    <div id="add-bar">
+      <select id="add-type">
+        <option value="box">Box</option>
+        <option value="cylinder">Cylinder</option>
+        <option value="wheel">Wheel (group)</option>
+      </select>
+      <button id="add-btn">+ Add Part</button>
+      <button id="undo-btn" class="action-btn" title="Undo last change">↩</button>
+    </div>
+
+    <div id="inspector">
+      <div id="inspector-title">Inspector</div>
+      <div id="no-selection">Select a part to edit</div>
+      <div id="inspector-fields" style="display:none">
+
+        <div class="insp-section">
+          <div class="insp-section-label">Name</div>
+          <div class="insp-row">
+            <input type="text" id="f-name" placeholder="part name">
+          </div>
+        </div>
+
+        <div class="insp-section" id="box-fields">
+          <div class="insp-section-label">Size</div>
+          <div class="insp-row"><label>W</label><input type="range" id="f-w" min="0.05" max="4" step="0.01"><span class="val" id="v-w">1.00</span></div>
+          <div class="insp-row"><label>H</label><input type="range" id="f-h" min="0.05" max="4" step="0.01"><span class="val" id="v-h">1.00</span></div>
+          <div class="insp-row"><label>D</label><input type="range" id="f-d" min="0.05" max="6" step="0.01"><span class="val" id="v-d">1.00</span></div>
+        </div>
+
+        <div class="insp-section" id="cyl-fields" style="display:none">
+          <div class="insp-section-label">Cylinder</div>
+          <div class="insp-row"><label>R</label><input type="range" id="f-r" min="0.02" max="2" step="0.01"><span class="val" id="v-r">0.40</span></div>
+          <div class="insp-row"><label>H</label><input type="range" id="f-ch" min="0.02" max="4" step="0.01"><span class="val" id="v-ch">0.30</span></div>
+          <div class="insp-row"><label>Axis</label>
+            <select id="f-axis" style="flex:1;background:#1a1a1a;border:1px solid #2a2a2a;color:#ccc;font-family:'Courier New',monospace;font-size:9px;padding:3px 5px">
+              <option value="y">Y (vertical)</option>
+              <option value="x">X (axle)</option>
+              <option value="z">Z (forward)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="insp-section">
+          <div class="insp-section-label">Position</div>
+          <div class="insp-row"><label>X</label><input type="range" id="f-px" min="-3" max="3" step="0.01"><span class="val" id="v-px">0.00</span></div>
+          <div class="insp-row"><label>Y</label><input type="range" id="f-py" min="-1" max="3" step="0.01"><span class="val" id="v-py">0.00</span></div>
+          <div class="insp-row"><label>Z</label><input type="range" id="f-pz" min="-4" max="4" step="0.01"><span class="val" id="v-pz">0.00</span></div>
+        </div>
+
+        <div class="insp-section">
+          <div class="insp-section-label">Rotation (rad)</div>
+          <div class="insp-row"><label>RX</label><input type="range" id="f-rx" min="-3.14" max="3.14" step="0.01"><span class="val" id="v-rx">0.00</span></div>
+          <div class="insp-row"><label>RY</label><input type="range" id="f-ry" min="-3.14" max="3.14" step="0.01"><span class="val" id="v-ry">0.00</span></div>
+          <div class="insp-row"><label>RZ</label><input type="range" id="f-rz" min="-3.14" max="3.14" step="0.01"><span class="val" id="v-rz">0.00</span></div>
+        </div>
+
+        <div class="insp-section">
+          <div class="insp-section-label">Material</div>
+          <div class="color-row" id="color-swatches"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="vehicles-bar">
+      <div id="vehicles-bar-label">Vehicles</div>
+      <div id="vehicles-row">
+        <select id="vehicle-select"><option value="">— new vehicle —</option></select>
+        <button class="veh-btn save" id="veh-save-btn">Save</button>
+        <button class="veh-btn del" id="veh-del-btn">Del</button>
+      </div>
+    </div>
+
+    <div id="actions">
+      <div id="name-row">
+        <label>NAME</label>
+        <input type="text" id="vehicle-name" value="MyVehicle" placeholder="vehicle name">
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="action-btn secondary" id="load-default-btn" style="flex:1">Load Current Truck</button>
+        <button class="action-btn" id="clear-btn" style="flex:1">Clear All</button>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="action-btn" id="lib-btn" style="flex:1">Parts Library</button>
+        <button class="action-btn primary" id="export-btn" style="flex:2">Export _build() Code</button>
+      </div>
+    </div>
+
+    </div><!-- /tab-builder -->
+
+    <!-- GARAGE TAB -->
+    <div class="tab-pane" id="tab-garage" style="flex-direction:column;overflow:hidden;">
+      <div id="garage-list">
+        <div id="garage-empty-state">No saved vehicles yet.<br>Build a vehicle, save it using the<br>Vehicles panel, then tune it here.</div>
+      </div>
+      <div style="padding:10px 14px;border-top:1px solid #1e1e1e;flex-shrink:0;">
+        <button class="action-btn primary" id="export-json-btn" style="width:100%">↓ Export vehicles.json</button>
+        <div style="font-size:9px;color:#666;letter-spacing:0.06em;margin-top:6px;line-height:1.6;">
+          Drop the exported file next to truck-game-v2.html.<br>The game will load it automatically on startup.
+        </div>
+      </div>
+    </div><!-- /tab-garage -->
+
+  </div><!-- /panel -->
+</div><!-- /app -->
+
+<!-- Library modal -->
+<div id="lib-modal">
+  <div id="lib-box">
+    <div id="lib-header">
+      <h2>Parts Library</h2>
+      <button id="lib-close">✕</button>
+    </div>
+    <div id="lib-list"></div>
+    <div id="lib-footer">
+      <div id="lib-save-hint">Save selected parts as a reusable group:</div>
+      <div id="save-part-row">
+        <input type="text" id="save-part-name" placeholder="e.g. snowplow, rollbar, headlights...">
+        <button class="lib-item-btn" id="save-part-btn">Save Selection</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Code modal -->
+<div id="code-modal">
+  <div id="code-box">
+    <div id="code-header">
+      <h2>Generated _build() method</h2>
+      <button id="code-close">✕</button>
+    </div>
+    <pre id="code-content"></pre>
+    <div id="code-footer">
+      <span id="copy-status">COPIED</span>
+      <button class="action-btn primary" id="copy-btn">Copy to Clipboard</button>
+      <button class="action-btn" id="code-close2">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── MATCAP COLORS ────────────────────────────────────────────
+const MATCAP_DEFS = {
+  red:    { base:'#c0392b', highlight:'#e8453a', mid:'#c0392b', shadow:'#6e1a14', rim:'rgba(255,180,100,0.4)' },
+  white:  { base:'#e8e4dc', highlight:'#ffffff', mid:'#e0dbd0', shadow:'#b0a898', rim:'rgba(255,220,150,0.3)' },
+  dark:   { base:'#1a1a1a', highlight:'#444444', mid:'#222222', shadow:'#080808', rim:'rgba(100,150,255,0.2)' },
+  chrome: { base:'#888888', highlight:'#ffffff', mid:'#aaaaaa', shadow:'#333333', rim:'rgba(200,220,255,0.5)' },
+  orange: { base:'#e67e22', highlight:'#f39c12', mid:'#e67e22', shadow:'#8e4a0e', rim:'rgba(255,200,100,0.4)' },
+  green:  { base:'#4a7c3f', highlight:'#6aac5e', mid:'#4a7c3f', shadow:'#1e3a1a', rim:'rgba(255,220,150,0.25)' },
+  tan:    { base:'#a08060', highlight:'#c4a882', mid:'#a08060', shadow:'#5a4030', rim:'rgba(255,200,100,0.3)' },
+  blue:   { base:'#2471a3', highlight:'#3498db', mid:'#2471a3', shadow:'#0e2d47', rim:'rgba(150,200,255,0.4)' },
+  glass:  { base:'#4a7fa5', highlight:'#b0d4f0', mid:'#5a9ac0', shadow:'#1a3a55', rim:'rgba(255,255,255,0.6)' },
+  rubber: { base:'#1a1a18', highlight:'#2a2a28', mid:'#1e1e1c', shadow:'#080808', rim:'rgba(80,80,80,0.2)' },
+  yellow: { base:'#f1c40f', highlight:'#f9e44a', mid:'#f1c40f', shadow:'#8a6e00', rim:'rgba(255,240,180,0.4)' },
+};
+const MATCAP_SWATCH_COLORS = {
+  red:'#c0392b', white:'#e8e4dc', dark:'#1a1a1a', chrome:'#aaaaaa',
+  orange:'#e67e22', green:'#4a7c3f', tan:'#a08060', blue:'#2471a3',
+  glass:'#5a9ac0', rubber:'#1a1a18', yellow:'#f1c40f',
+};
+
+const MATCAPS = {};
+function buildMatcapTex(name) {
+  const config = MATCAP_DEFS[name];
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size/2, cy = size/2, r = size/2;
+  ctx.fillStyle = config.base; ctx.fillRect(0,0,size,size);
+  ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
+  const grad = ctx.createRadialGradient(cx,cy*0.6,0,cx,cy,r);
+  grad.addColorStop(0,config.highlight); grad.addColorStop(0.5,config.mid); grad.addColorStop(1,config.shadow);
+  ctx.fillStyle = grad; ctx.fillRect(0,0,size,size);
+  const spec = ctx.createRadialGradient(cx*0.65,cy*0.45,0,cx*0.65,cy*0.45,r*0.35);
+  spec.addColorStop(0,'rgba(255,255,255,0.85)'); spec.addColorStop(0.5,'rgba(255,255,255,0.15)'); spec.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = spec; ctx.fillRect(0,0,size,size);
+  const rim = ctx.createRadialGradient(cx*1.55,cy*1.55,0,cx*1.55,cy*1.55,r*0.5);
+  rim.addColorStop(0, config.rim||'rgba(255,200,100,0.3)'); rim.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle = rim; ctx.fillRect(0,0,size,size);
+  ctx.restore();
+  const tex = new THREE.CanvasTexture(canvas); tex.needsUpdate = true; return tex;
+}
+Object.keys(MATCAP_DEFS).forEach(n => { MATCAPS[n] = buildMatcapTex(n); });
+function matcapMat(name) { return new THREE.MeshMatcapMaterial({ matcap: MATCAPS[name] }); }
+
+// ── THREE.JS SETUP ───────────────────────────────────────────
+const viewport = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0xd0cfc8);
+viewport.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 200);
+camera.position.set(5, 4, 8);
+camera.lookAt(0, 1, 0);
+
+// Grid
+const grid = new THREE.GridHelper(12, 12, 0xb0afa8, 0xbebdb6);
+scene.add(grid);
+
+// Axis arrows
+const arrowsGroup = new THREE.Group();
+[[1,0,0,'#e74c3c'],[0,1,0,'#2ecc71'],[0,0,1,'#3498db']].forEach(([x,y,z,col]) => {
+  const arr = new THREE.ArrowHelper(new THREE.Vector3(x,y,z), new THREE.Vector3(0,0,0), 1.5, col, 0.2, 0.1);
+  arrowsGroup.add(arr);
+});
+scene.add(arrowsGroup);
+
+// Reference chassis wireframe
+const chassisWire = new THREE.Mesh(
+  new THREE.BoxGeometry(1.9, 0.6, 4.0),
+  new THREE.MeshBasicMaterial({ color: 0x223344, wireframe: true, opacity: 0.3, transparent: true })
+);
+chassisWire.position.y = 0.7;
+scene.add(chassisWire);
+
+// Wheel position reference dots
+const wheelPositions = [[-0.88,0.4,-1.15],[0.88,0.4,-1.15],[-0.88,0.4,1.18],[0.88,0.4,1.18]];
+wheelPositions.forEach(([x,y,z]) => {
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.06,8,8), new THREE.MeshBasicMaterial({color:0x3a5a3a}));
+  dot.position.set(x,y,z); scene.add(dot);
+});
+
+// Resize handler
+function resize() {
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ── ORBIT CONTROLS (manual) ──────────────────────────────────
+let isDragging = false, lastX = 0, lastY = 0;
+let spherical = { theta: 0.6, phi: 1.1, radius: 10 };
+let lookTarget = new THREE.Vector3(0, 1, 0);
+
+function updateCamera() {
+  camera.position.set(
+    lookTarget.x + spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta),
+    lookTarget.y + spherical.radius * Math.cos(spherical.phi),
+    lookTarget.z + spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta)
+  );
+  camera.lookAt(lookTarget);
+}
+updateCamera();
+
+renderer.domElement.addEventListener('mousedown', e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
+window.addEventListener('mouseup', () => { isDragging = false; });
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+  spherical.theta -= dx * 0.008;
+  spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi + dy * 0.008));
+  updateCamera();
+});
+renderer.domElement.addEventListener('wheel', e => {
+  spherical.radius = Math.max(2, Math.min(30, spherical.radius + e.deltaY * 0.01));
+  updateCamera();
+});
+
+// ── PARTS DATA ───────────────────────────────────────────────
+let parts = [];
+let selectedIds = new Set(); // multi-select
+let selectedId = null;    // primary (for inspector)
+let nextId = 1;
+
+// ── UNDO STACK ───────────────────────────────────────────────
+let undoStack = [];
+function pushUndo() {
+  undoStack.push(JSON.parse(JSON.stringify(parts.map(p => { const {mesh, ...rest} = p; return rest; }))));
+  if (undoStack.length > 40) undoStack.shift();
+  document.getElementById('undo-btn').classList.add('active');
+}
+function undo() {
+  if (!undoStack.length) return;
+  // Remove all current meshes
+  parts.forEach(p => { if (p.mesh) { scene.remove(p.mesh); p.mesh.geometry.dispose(); } });
+  const prev = undoStack.pop();
+  parts = prev.map(d => { const p = createPart(d.type); Object.assign(p, d); buildMesh(p); return p; });
+  if (!undoStack.length) document.getElementById('undo-btn').classList.remove('active');
+  if (selectedId && !parts.find(p => p.id === selectedId)) selectedId = null;
+  selectedIds = new Set(selectedId ? [selectedId] : []);
+  renderPartsList(); renderInspector();
+}
+
+// ── PARTS LIBRARY ────────────────────────────────────────────
+let partsLibrary = JSON.parse(localStorage.getItem('vb-parts-library') || '[]');
+function saveLibrary() { localStorage.setItem('vb-parts-library', JSON.stringify(partsLibrary)); }
+
+// ── VEHICLES STORE ───────────────────────────────────────────
+let vehicles = JSON.parse(localStorage.getItem('vb-vehicles') || '[]');
+function saveVehicles() { localStorage.setItem('vb-vehicles', JSON.stringify(vehicles)); }
+
+function serializeParts() {
+  return parts.map(p => { const {mesh, ...rest} = p; return {...rest}; });
+}
+
+function loadPartsFromData(data) {
+  parts.forEach(p => { if (p.mesh) { scene.remove(p.mesh); p.mesh.geometry.dispose(); } });
+  parts = []; selectedId = null; selectedIds = new Set(); nextId = 1;
+  data.forEach(d => {
+    const p = createPart(d.type);
+    Object.assign(p, d);
+    if (p.id >= nextId) nextId = p.id + 1;
+    parts.push(p);
+    buildMesh(p);
+  });
+  renderPartsList(); renderInspector();
+}
+
+function refreshVehicleSelect() {
+  const sel = document.getElementById('vehicle-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— new vehicle —</option>';
+  vehicles.forEach((v, i) => {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = v.name;
+    sel.appendChild(opt);
+  });
+  if (cur !== '') sel.value = cur;
+}
+
+function createPart(type = 'box') {
+  return {
+    id: nextId++,
+    type,
+    name: type === 'wheel' ? 'wheel_group' : type + '_' + nextId,
+    // box dims
+    w: 1.0, h: 0.5, d: 1.0,
+    // cyl dims
+    r: 0.4, ch: 0.3, axis: 'x',
+    // transform
+    px: 0, py: 0.5, pz: 0,
+    rx: 0, ry: 0, rz: 0,
+    // material
+    mat: 'blue',
+    // three mesh
+    mesh: null,
+  };
+}
+
+function buildMesh(part) {
+  if (part.mesh) { scene.remove(part.mesh); part.mesh.geometry.dispose(); }
+
+  let geo;
+  if (part.type === 'box') {
+    geo = new THREE.BoxGeometry(part.w, part.h, part.d);
+  } else if (part.type === 'cylinder') {
+    geo = new THREE.CylinderGeometry(part.r, part.r, part.ch, 16);
+  } else { // wheel placeholder
+    const g = new THREE.TorusGeometry(0.4, 0.12, 8, 18);
+    geo = g;
+  }
+
+  const mat = matcapMat(part.mat);
+  const mesh = new THREE.Mesh(geo, mat);
+
+  if (part.type === 'cylinder') {
+    if (part.axis === 'x') mesh.rotation.z = Math.PI / 2;
+    else if (part.axis === 'z') mesh.rotation.x = Math.PI / 2;
+  }
+
+  mesh.position.set(part.px, part.py, part.pz);
+  mesh.rotation.x += part.rx;
+  mesh.rotation.y += part.ry;
+  mesh.rotation.z += part.rz;
+
+  // Selection highlight — blue for primary, orange for multi-selected
+  if (part.id === selectedId) {
+    const edges = new THREE.EdgesGeometry(geo);
+    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x3498db, opacity: 0.9, transparent: true }));
+    mesh.add(line);
+  } else if (selectedIds.has(part.id)) {
+    const edges = new THREE.EdgesGeometry(geo);
+    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xf39c12, opacity: 0.7, transparent: true }));
+    mesh.add(line);
+  }
+
+  scene.add(mesh);
+  part.mesh = mesh;
+}
+
+function rebuildAll() {
+  parts.forEach(buildMesh);
+}
+
+// ── PARTS LIST UI ────────────────────────────────────────────
+function renderPartsList() {
+  const list = document.getElementById('parts-list');
+  list.innerHTML = '';
+  const countEl = document.getElementById('selection-count');
+  const total = selectedIds.size + (selectedId ? 1 : 0);
+  if (total > 1) { countEl.textContent = total + ' parts selected (shift+click to add/remove)'; countEl.classList.add('visible'); }
+  else if (total === 1) { countEl.textContent = 'shift+click to multi-select'; countEl.classList.add('visible'); }
+  else { countEl.classList.remove('visible'); }
+  parts.forEach(part => {
+    const item = document.createElement('div');
+    const isSelected = part.id === selectedId;
+    const isMulti = selectedIds.has(part.id) && !isSelected;
+    item.className = 'part-item' + (isSelected ? ' selected' : '') + (isMulti ? ' multi-selected' : '');
+    item.dataset.id = part.id;
+
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    dot.style.background = MATCAP_SWATCH_COLORS[part.mat] || '#888';
+
+    const name = document.createElement('span');
+    name.className = 'part-name';
+    name.textContent = part.name;
+
+    const type = document.createElement('span');
+    type.className = 'part-type';
+    type.textContent = part.type;
+
+    const copy = document.createElement('button');
+    copy.className = 'copy-btn';
+    copy.textContent = '⧉';
+    copy.title = 'Duplicate';
+    copy.onclick = e => { e.stopPropagation(); duplicatePart(part.id); };
+
+    const del = document.createElement('button');
+    del.className = 'del-btn';
+    del.textContent = '✕';
+    del.onclick = e => { e.stopPropagation(); deletePart(part.id); };
+
+    item.appendChild(dot);
+    item.appendChild(name);
+    item.appendChild(type);
+    item.appendChild(copy);
+    item.appendChild(del);
+    item.onclick = e => {
+      if (e.shiftKey) {
+        // Toggle in multi-selection
+        if (selectedIds.has(part.id)) { selectedIds.delete(part.id); if (selectedId === part.id) selectedId = [...selectedIds][0] || null; }
+        else { selectedIds.add(part.id); selectedId = part.id; }
+        renderPartsList(); renderInspector(); rebuildAll();
+      } else {
+        selectPart(part.id);
+      }
+    };
+    list.appendChild(item);
+  });
+}
+
+function selectPart(id) {
+  selectedId = id;
+  selectedIds = new Set(id ? [id] : []);
+  renderPartsList();
+  renderInspector();
+  rebuildAll();
+}
+
+function deletePart(id) {
+  pushUndo();
+  const part = parts.find(p => p.id === id);
+  if (part && part.mesh) { scene.remove(part.mesh); part.mesh.geometry.dispose(); }
+  parts = parts.filter(p => p.id !== id);
+  if (selectedId === id) selectedId = null;
+  selectedIds.delete(id);
+  renderPartsList();
+  renderInspector();
+}
+
+function duplicatePart(id) {
+  pushUndo();
+  const src = parts.find(p => p.id === id);
+  if (!src) return;
+  const clone = createPart(src.type);
+  const {mesh, id: _, ...rest} = src;
+  Object.assign(clone, rest);
+  clone.name = src.name + '_copy';
+  clone.px += 0.2; clone.py += 0.1; // slight offset so it's visible
+  parts.push(clone);
+  buildMesh(clone);
+  selectPart(clone.id);
+  renderPartsList();
+}
+
+// ── INSPECTOR UI ─────────────────────────────────────────────
+function renderInspector() {
+  const part = parts.find(p => p.id === selectedId);
+  document.getElementById('no-selection').style.display = part ? 'none' : 'block';
+  document.getElementById('inspector-fields').style.display = part ? 'block' : 'none';
+  if (!part) return;
+
+  document.getElementById('f-name').value = part.name;
+  document.getElementById('box-fields').style.display = part.type === 'box' ? 'block' : 'none';
+  document.getElementById('cyl-fields').style.display = part.type === 'cylinder' ? 'block' : 'none';
+
+  const setSlider = (id, val, vidx) => {
+    document.getElementById(id).value = val;
+    document.getElementById(vidx).textContent = val.toFixed(2);
+  };
+
+  if (part.type === 'box') {
+    setSlider('f-w','f-w' in part ? part.w : 1, 'v-w'); document.getElementById('f-w').value = part.w; document.getElementById('v-w').textContent = part.w.toFixed(2);
+    document.getElementById('f-h').value = part.h; document.getElementById('v-h').textContent = part.h.toFixed(2);
+    document.getElementById('f-d').value = part.d; document.getElementById('v-d').textContent = part.d.toFixed(2);
+  }
+  if (part.type === 'cylinder') {
+    document.getElementById('f-r').value = part.r; document.getElementById('v-r').textContent = part.r.toFixed(2);
+    document.getElementById('f-ch').value = part.ch; document.getElementById('v-ch').textContent = part.ch.toFixed(2);
+    document.getElementById('f-axis').value = part.axis;
+  }
+  document.getElementById('f-px').value = part.px; document.getElementById('v-px').textContent = part.px.toFixed(2);
+  document.getElementById('f-py').value = part.py; document.getElementById('v-py').textContent = part.py.toFixed(2);
+  document.getElementById('f-pz').value = part.pz; document.getElementById('v-pz').textContent = part.pz.toFixed(2);
+  document.getElementById('f-rx').value = part.rx; document.getElementById('v-rx').textContent = part.rx.toFixed(2);
+  document.getElementById('f-ry').value = part.ry; document.getElementById('v-ry').textContent = part.ry.toFixed(2);
+  document.getElementById('f-rz').value = part.rz; document.getElementById('v-rz').textContent = part.rz.toFixed(2);
+
+  // Color swatches
+  const swatchContainer = document.getElementById('color-swatches');
+  swatchContainer.innerHTML = '';
+  Object.entries(MATCAP_SWATCH_COLORS).forEach(([name, col]) => {
+    const sw = document.createElement('div');
+    sw.className = 'color-swatch' + (part.mat === name ? ' active' : '');
+    sw.style.background = col;
+    sw.title = name;
+    sw.onclick = () => { part.mat = name; buildMesh(part); renderPartsList(); renderInspector(); };
+    swatchContainer.appendChild(sw);
+  });
+}
+
+// Wire up inspector inputs
+function wireInput(inputId, field, valId, isFloat = true) {
+  let _prevVal = null;
+  document.getElementById(inputId).addEventListener('mousedown', () => { const part = parts.find(p => p.id === selectedId); if (part) { pushUndo(); } });
+  document.getElementById(inputId).addEventListener('input', e => {
+    const part = parts.find(p => p.id === selectedId);
+    if (!part) return;
+    part[field] = isFloat ? parseFloat(e.target.value) : e.target.value;
+    if (valId) document.getElementById(valId).textContent = parseFloat(e.target.value).toFixed(2);
+    buildMesh(part);
+    if (field === 'name') { renderPartsList(); return; }
+  });
+}
+wireInput('f-name', 'name', null, false);
+wireInput('f-w','w','v-w'); wireInput('f-h','h','v-h'); wireInput('f-d','d','v-d');
+wireInput('f-r','r','v-r'); wireInput('f-ch','ch','v-ch');
+wireInput('f-px','px','v-px'); wireInput('f-py','py','v-py'); wireInput('f-pz','pz','v-pz');
+wireInput('f-rx','rx','v-rx'); wireInput('f-ry','ry','v-ry'); wireInput('f-rz','rz','v-rz');
+document.getElementById('f-axis').addEventListener('change', e => {
+  const part = parts.find(p => p.id === selectedId);
+  if (!part) return;
+  part.axis = e.target.value;
+  buildMesh(part);
+});
+
+// ── ADD / CLEAR ──────────────────────────────────────────────
+document.getElementById('clear-btn').onclick = () => {
+  if (!confirm('Clear all parts?')) return;
+  pushUndo();
+  parts.forEach(p => { if (p.mesh) { scene.remove(p.mesh); p.mesh.geometry.dispose(); } });
+  parts = []; selectedId = null; selectedIds = new Set();
+  renderPartsList(); renderInspector();
+};
+
+// ── LOAD DEFAULT TRUCK ───────────────────────────────────────
+document.getElementById('load-default-btn').onclick = () => {
+  const saved = localStorage.getItem('vb-last-export');
+  if (saved) {
+    if (parts.length && !confirm('Replace current parts with last exported vehicle?')) return;
+    const data = JSON.parse(saved);
+    document.getElementById('vehicle-name').value = data.name || 'MyVehicle';
+    loadPartsFromData(data.parts);
+    return;
+  }
+  if (parts.length && !confirm('Replace current parts with the default truck?')) return;
+  parts.forEach(p => { if (p.mesh) { scene.remove(p.mesh); p.mesh.geometry.dispose(); } });
+  parts = []; selectedId = null; selectedIds = new Set(); nextId = 1;
+
+  const defaults = [
+    {name:'lowerBody', type:'box', w:1.90, h:0.55, d:1.98, px:0, py:0.72, pz:-0.96, rx:0, ry:0, rz:0, mat:'blue'},
+    {name:'cabBody', type:'box', w:1.84, h:0.62, d:0.93, px:0, py:1.28, pz:-0.43, rx:0, ry:0, rz:0, mat:'blue'},
+    {name:'cabRoof', type:'box', w:1.82, h:0.14, d:0.93, px:0, py:1.66, pz:-0.43, rx:0, ry:0, rz:0, mat:'blue'},
+    {name:'hood', type:'box', w:1.82, h:0.18, d:1.05, px:0, py:0.97, pz:-1.44, rx:0, ry:0, rz:0, mat:'blue'},
+    {name:'windshield', type:'box', w:1.50, h:0.83, d:0.05, px:0.04, py:1.19, pz:-1.13, rx:0.69, ry:0, rz:0, mat:'glass'},
+    {name:'rearWindow', type:'box', w:1.60, h:0.42, d:0.07, px:0, py:1.35, pz:0.03, rx:0, ry:0, rz:0, mat:'glass'},
+    {name:'sideWin_L', type:'box', w:0.07, h:0.38, d:0.70, px:-0.92, py:1.36, pz:-0.46, rx:0, ry:0, rz:0, mat:'glass'},
+    {name:'sideWin_R', type:'box', w:0.07, h:0.38, d:0.70, px:0.92, py:1.36, pz:-0.46, rx:0, ry:0, rz:0, mat:'glass'},
+    {name:'grille', type:'box', w:0.76, h:0.21, d:0.19, px:-0.01, py:0.79, pz:-1.88, rx:0, ry:0, rz:0, mat:'dark'},
+    {name:'fBumper', type:'box', w:1.92, h:0.20, d:0.22, px:-0.02, py:0.52, pz:-1.97, rx:0, ry:0, rz:0, mat:'dark'},
+    {name:'headlight_L', type:'cylinder', r:0.16, ch:0.10, axis:'z', px:-0.58, py:0.82, pz:-1.96, rx:0, ry:0, rz:0, mat:'chrome'},
+    {name:'headlight_R', type:'cylinder', r:0.16, ch:0.10, axis:'z', px:0.58, py:0.83, pz:-1.96, rx:0, ry:0, rz:0, mat:'chrome'},
+    {name:'bedFloor', type:'box', w:1.66, h:0.12, d:2.26, px:0, py:0.77, pz:1.12, rx:0, ry:0, rz:0, mat:'chrome'},
+    {name:'bedWall_L', type:'box', w:0.14, h:0.46, d:2.26, px:-0.88, py:0.97, pz:1.16, rx:0, ry:0, rz:0, mat:'blue'},
+    {name:'bedWall_R', type:'box', w:0.14, h:0.46, d:2.26, px:0.88, py:0.97, pz:1.13, rx:0, ry:0, rz:0, mat:'blue'},
+    {name:'tailgate', type:'box', w:1.66, h:0.46, d:0.12, px:0, py:0.97, pz:2.22, rx:0, ry:0, rz:0, mat:'blue'},
+    {name:'tailLight_L', type:'box', w:0.14, h:0.18, d:0.06, px:-0.70, py:0.97, pz:2.31, rx:0, ry:0, rz:0, mat:'red'},
+    {name:'tailLight_R', type:'box', w:0.14, h:0.18, d:0.06, px:0.70, py:0.97, pz:2.31, rx:0, ry:0, rz:0, mat:'red'},
+    {name:'hitch', type:'box', w:0.12, h:0.12, d:0.22, px:0, py:0.45, pz:2.34, rx:0, ry:0, rz:0, mat:'chrome'},
+    {name:'rollbar_L', type:'cylinder', r:0.06, ch:0.82, axis:'y', px:-0.62, py:1.52, pz:-0.15, rx:0, ry:0, rz:0, mat:'dark'},
+    {name:'rollbar_R', type:'cylinder', r:0.06, ch:0.82, axis:'y', px:0.62, py:1.52, pz:-0.15, rx:0, ry:0, rz:0, mat:'dark'},
+    {name:'rollbar_top', type:'box', w:1.24, h:0.10, d:0.12, px:0, py:1.94, pz:-0.15, rx:0, ry:0, rz:0, mat:'dark'},
+    {name:'plowBlade', type:'box', w:2.40, h:0.62, d:0.10, px:0, py:0.05, pz:-2.52, rx:0.22, ry:0, rz:0, mat:'yellow'},
+    {name:'plowArm_L', type:'box', w:0.08, h:0.08, d:0.55, px:-0.55, py:0.05, pz:-2.22, rx:0, ry:0, rz:0, mat:'chrome'},
+    {name:'plowArm_R', type:'box', w:0.08, h:0.08, d:0.55, px:0.55, py:0.05, pz:-2.22, rx:0, ry:0, rz:0, mat:'chrome'},
+    {name:'plowCap', type:'box', w:2.44, h:0.08, d:0.12, px:0, py:0.37, pz:-2.51, rx:0, ry:0, rz:0, mat:'chrome'},
+    {name:'plowSkid', type:'box', w:2.44, h:0.07, d:0.12, px:0, py:-0.28, pz:-2.53, rx:0, ry:0, rz:0, mat:'dark'},
+    {name:'fenderArch_L', type:'cylinder', r:0.47, ch:0.35, axis:'x', px:-0.87, py:0.57, pz:1.19, rx:0, ry:0, rz:0, mat:'blue'},
+    {name:'fenderArch_R', type:'cylinder', r:0.47, ch:0.35, axis:'x', px:0.87, py:0.57, pz:1.19, rx:0, ry:0, rz:0, mat:'blue'},
+    {name:'cargoBox', type:'box', w:1.89, h:0.21, d:0.77, px:0, py:0.63, pz:1.93, rx:0, ry:0, rz:0, mat:'dark'},
+    {name:'plate', type:'box', w:0.56, h:0.16, d:0.05, px:0, py:0.84, pz:2.28, rx:0, ry:0, rz:0, mat:'chrome'},
+    {name:'wheel_FL', type:'cylinder', r:0.40, ch:0.34, axis:'x', px:-0.88, py:0.40, pz:-1.15, rx:0, ry:0, rz:0, mat:'rubber'},
+    {name:'wheel_FR', type:'cylinder', r:0.40, ch:0.34, axis:'x', px:0.88, py:0.40, pz:-1.15, rx:0, ry:0, rz:0, mat:'rubber'},
+    {name:'wheel_RL', type:'cylinder', r:0.40, ch:0.34, axis:'x', px:-0.88, py:0.40, pz:1.18, rx:0, ry:0, rz:0, mat:'rubber'},
+    {name:'wheel_RR', type:'cylinder', r:0.40, ch:0.34, axis:'x', px:0.88, py:0.40, pz:1.18, rx:0, ry:0, rz:0, mat:'rubber'}
+  ];
+
+  defaults.forEach(d => {
+    const p = createPart(d.type);
+    Object.assign(p, d);
+    parts.push(p);
+    buildMesh(p);
+  });
+  renderPartsList();
+  renderInspector();
+};
+
+// ── CODE EXPORT ──────────────────────────────────────────────
+document.getElementById('export-btn').onclick = () => {
+  const name = document.getElementById('vehicle-name').value || 'MyVehicle';
+  const lines = [];
+  lines.push(`  {`);
+  lines.push(`    name: '${name}',`);
+  lines.push(`    description: 'Custom vehicle.',`);
+  lines.push(`    physics: {`);
+  lines.push(`      mass: 150,          // kg — heavier = more momentum, harder to steer`);
+  lines.push(`      engineForce: 1800,  // higher = faster top speed`);
+  lines.push(`      brakeForce: 80,`);
+  lines.push(`      maxSteerAngle: 0.52, // radians — higher = tighter turns`);
+  lines.push(`      steerSpeed: 2.8,`);
+  lines.push(`      steerReturn: 4.0,`);
+  lines.push(`      suspensionStiffness: 35,`);
+  lines.push(`      frictionSlip: 2.2,  // higher = more grip`);
+  lines.push(`    },`);
+  lines.push(`    build(bodyGroup, scene, wheelGroups) {`);
+  lines.push(`      const body = bodyGroup;`);
+  lines.push(`      const box = (w,h,d,mat) => new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);`);
+  lines.push(`      const cyl = (rt,rb,h,s,mat) => new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,s), mat);`);
+  lines.push(`      `);
+
+  // Collect unique materials
+  const usedMats = [...new Set(parts.map(p => p.mat))];
+  usedMats.forEach(m => {
+    lines.push(`      const m_${m} = matcapMat('${m}');`);
+  });
+  lines.push(``);
+
+  const wheelParts = [];
+  parts.forEach(part => {
+    const mat = `m_${part.mat}`;
+    const pos = `(${f(part.px)}, ${f(part.py)}, ${f(part.pz)})`;
+    const hasRot = part.rx !== 0 || part.ry !== 0 || part.rz !== 0;
+
+    if (part.type === 'box') {
+      lines.push(`      // ${part.name}`);
+      lines.push(`      const ${part.name} = box(${f(part.w)}, ${f(part.h)}, ${f(part.d)}, ${mat});`);
+      lines.push(`      ${part.name}.position.set${pos};`);
+      if (hasRot) {
+        if (part.rx !== 0) lines.push(`    ${part.name}.rotation.x = ${f(part.rx)};`);
+        if (part.ry !== 0) lines.push(`    ${part.name}.rotation.y = ${f(part.ry)};`);
+        if (part.rz !== 0) lines.push(`    ${part.name}.rotation.z = ${f(part.rz)};`);
+      }
+      lines.push(`    body.add(${part.name});`);
+      lines.push(``);
+    } else if (part.type === 'cylinder') {
+      lines.push(`      // ${part.name}`);
+      lines.push(`      const ${part.name} = cyl(${f(part.r)}, ${f(part.r)}, ${f(part.ch)}, 16, ${mat});`);
+      if (part.axis === 'x') lines.push(`    ${part.name}.rotation.z = Math.PI / 2;`);
+      if (part.axis === 'z') lines.push(`    ${part.name}.rotation.x = Math.PI / 2;`);
+      if (part.rx !== 0) lines.push(`    ${part.name}.rotation.x += ${f(part.rx)};`);
+      if (part.ry !== 0) lines.push(`    ${part.name}.rotation.y += ${f(part.ry)};`);
+      if (part.rz !== 0) lines.push(`    ${part.name}.rotation.z += ${f(part.rz)};`);
+      lines.push(`      ${part.name}.position.set${pos};`);
+      lines.push(`    body.add(${part.name});`);
+      lines.push(``);
+    } else if (part.type === 'wheel') {
+      wheelParts.push(part);
+    }
+  });
+
+  // Wheel groups
+  if (wheelParts.length > 0) {
+    lines.push(`    // ── WHEELS ───────────────────────────────────────────`);
+    lines.push(`    const mRubber = matcapMat('rubber');`);
+    lines.push(`    const mWhite  = matcapMat('white');`);
+    lines.push(`    const mDark   = matcapMat('dark');`);
+    lines.push(`    for (let i = 0; i < 4; i++) {`);
+    lines.push(`      const wg = new THREE.Group(); this.scene.add(wg);`);
+    lines.push(`      const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.34,18), mRubber);`);
+    lines.push(`      tire.rotation.z = Math.PI/2; wg.add(tire);`);
+    lines.push(`      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,0.35,10), mWhite);`);
+    lines.push(`      rim.rotation.z = Math.PI/2; wg.add(rim);`);
+    lines.push(`      for (let s=0;s<5;s++) {`);
+    lines.push(`        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.36,0.06,0.06), mDark);`);
+    lines.push(`        spoke.rotation.x = (s/5)*Math.PI*2; wg.add(spoke);`);
+    lines.push(`      }`);
+    lines.push(`      this.wheelGroups.push(wg);`);
+    lines.push(`    }`);
+    lines.push(``);
+  }
+
+  // Wheel groups (standard — always added)
+  lines.push(`      // Wheel groups`);
+  lines.push(`      for (let i = 0; i < 4; i++) {`);
+  lines.push(`        const wg = new THREE.Group(); scene.add(wg);`);
+  lines.push(`        const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.34,18), matcapMat('rubber')); tire.rotation.z = Math.PI/2; wg.add(tire);`);
+  lines.push(`        const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,0.35,10), matcapMat('white')); rim.rotation.z = Math.PI/2; wg.add(rim);`);
+  lines.push(`        for (let s=0;s<5;s++) { const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.36,0.06,0.06), matcapMat('dark')); spoke.rotation.x=(s/5)*Math.PI*2; wg.add(spoke); }`);
+  lines.push(`        wheelGroups.push(wg);`);
+  lines.push(`      }`);
+  lines.push(`    }`);
+  lines.push(`  },`);
+
+  const code = lines.join('\n');
+  document.getElementById('code-content').textContent = code;
+  document.getElementById('code-modal').classList.add('open');
+  // Persist as last export so it loads next time
+  localStorage.setItem('vb-last-export', JSON.stringify({ name, parts: serializeParts() }));
+};
+
+function f(n) { return parseFloat(n.toFixed(2)); }
+
+document.getElementById('undo-btn').onclick = undo;
+
+document.getElementById('copy-btn').onclick = () => {
+  navigator.clipboard.writeText(document.getElementById('code-content').textContent);
+  const s = document.getElementById('copy-status');
+  s.style.opacity = 1;
+  setTimeout(() => s.style.opacity = 0, 1800);
+};
+document.getElementById('code-close').onclick = () => document.getElementById('code-modal').classList.remove('open');
+document.getElementById('code-close2').onclick = () => document.getElementById('code-modal').classList.remove('open');
+
+// ── PARTS LIBRARY UI ─────────────────────────────────────────
+function renderLibrary() {
+  const list = document.getElementById('lib-list');
+  list.innerHTML = '';
+  if (!partsLibrary.length) {
+    list.innerHTML = '<div id="lib-empty">No saved parts yet. Select some parts and save them as a group.</div>';
+    return;
+  }
+  partsLibrary.forEach((entry, idx) => {
+    const item = document.createElement('div');
+    item.className = 'lib-item';
+
+    const name = document.createElement('span');
+    name.className = 'lib-item-name';
+    name.textContent = entry.name;
+
+    const count = document.createElement('span');
+    count.className = 'lib-item-count';
+    count.textContent = entry.parts.length + ' parts';
+
+    const useBtn = document.createElement('button');
+    useBtn.className = 'lib-item-btn';
+    useBtn.textContent = 'Insert';
+    useBtn.onclick = () => {
+      pushUndo();
+      entry.parts.forEach(d => {
+        const p = createPart(d.type);
+        Object.assign(p, d);
+        p.id = nextId++; // new id to avoid conflicts
+        parts.push(p);
+        buildMesh(p);
+      });
+      renderPartsList();
+      document.getElementById('lib-modal').classList.remove('open');
+    };
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'lib-item-btn del';
+    delBtn.textContent = 'Delete';
+    delBtn.onclick = () => {
+      if (!confirm(`Delete "${entry.name}" from library?`)) return;
+      partsLibrary.splice(idx, 1);
+      saveLibrary();
+      // ── VEHICLE BUTTONS ──────────────────────────────────────────
+document.getElementById('veh-save-btn').onclick = () => {
+  const name = document.getElementById('vehicle-name').value.trim() || 'Unnamed';
+  const sel = document.getElementById('vehicle-select');
+  const idx = parseInt(sel.value);
+  if (!isNaN(idx) && vehicles[idx]) {
+    if (!confirm('Overwrite "' + vehicles[idx].name + '"?')) return;
+    vehicles[idx] = { name, parts: serializeParts() };
+  } else {
+    vehicles.push({ name, parts: serializeParts() });
+  }
+  saveVehicles();
+  refreshVehicleSelect();
+  document.getElementById('vehicle-select').value = vehicles.length - 1;
+};
+
+document.getElementById('veh-del-btn').onclick = () => {
+  const idx = parseInt(document.getElementById('vehicle-select').value);
+  if (isNaN(idx) || !vehicles[idx]) { alert('Select a saved vehicle to delete.'); return; }
+  if (!confirm('Delete "' + vehicles[idx].name + '"?')) return;
+  vehicles.splice(idx, 1);
+  saveVehicles();
+  refreshVehicleSelect();
+};
+
+document.getElementById('vehicle-select').addEventListener('change', e => {
+  const idx = parseInt(e.target.value);
+  if (isNaN(idx) || !vehicles[idx]) return;
+  if (parts.length && !confirm('Load "' + vehicles[idx].name + '"? Unsaved changes will be lost.')) { e.target.value = ''; return; }
+  document.getElementById('vehicle-name').value = vehicles[idx].name;
+  loadPartsFromData(vehicles[idx].parts);
+});
+
+refreshVehicleSelect();
+refreshAddTypeSelect();
+      renderLibrary();
+    };
+
+    item.appendChild(name);
+    item.appendChild(count);
+    item.appendChild(useBtn);
+    item.appendChild(delBtn);
+    list.appendChild(item);
+  });
+}
+
+function refreshAddTypeSelect() {
+  const sel = document.getElementById('add-type');
+  // Remove existing library options
+  while (sel.options.length > 3) sel.remove(3);
+  // Add separator + library entries
+  if (partsLibrary.length) {
+    const sep = document.createElement('option');
+    sep.disabled = true; sep.textContent = '── Library ──';
+    sel.appendChild(sep);
+    partsLibrary.forEach((entry, idx) => {
+      const opt = document.createElement('option');
+      opt.value = 'lib:' + idx;
+      opt.textContent = entry.name;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+document.getElementById('lib-btn').onclick = () => {
+  renderLibrary();
+  document.getElementById('lib-modal').classList.add('open');
+};
+document.getElementById('lib-close').onclick = () => document.getElementById('lib-modal').classList.remove('open');
+
+document.getElementById('save-part-btn').onclick = () => {
+  const allSelected = new Set([...selectedIds, ...(selectedId ? [selectedId] : [])]);
+  const selected = parts.filter(p => allSelected.has(p.id));
+  if (!selected.length) { alert('Select at least one part first.'); return; }
+  const name = document.getElementById('save-part-name').value.trim();
+  if (!name) { alert('Enter a name for this part group.'); return; }
+  // Save all currently selected parts (single for now, multi later)
+  const toSave = selected.map(p => { const {mesh, ...rest} = p; return {...rest}; });
+  partsLibrary.push({ name, parts: toSave });
+  saveLibrary();
+  // ── VEHICLE BUTTONS ──────────────────────────────────────────
+document.getElementById('veh-save-btn').onclick = () => {
+  const name = document.getElementById('vehicle-name').value.trim() || 'Unnamed';
+  const sel = document.getElementById('vehicle-select');
+  const idx = parseInt(sel.value);
+  if (!isNaN(idx) && vehicles[idx]) {
+    if (!confirm('Overwrite "' + vehicles[idx].name + '"?')) return;
+    vehicles[idx] = { name, parts: serializeParts() };
+  } else {
+    vehicles.push({ name, parts: serializeParts() });
+  }
+  saveVehicles();
+  refreshVehicleSelect();
+  document.getElementById('vehicle-select').value = vehicles.length - 1;
+};
+
+document.getElementById('veh-del-btn').onclick = () => {
+  const idx = parseInt(document.getElementById('vehicle-select').value);
+  if (isNaN(idx) || !vehicles[idx]) { alert('Select a saved vehicle to delete.'); return; }
+  if (!confirm('Delete "' + vehicles[idx].name + '"?')) return;
+  vehicles.splice(idx, 1);
+  saveVehicles();
+  refreshVehicleSelect();
+};
+
+document.getElementById('vehicle-select').addEventListener('change', e => {
+  const idx = parseInt(e.target.value);
+  if (isNaN(idx) || !vehicles[idx]) return;
+  if (parts.length && !confirm('Load "' + vehicles[idx].name + '"? Unsaved changes will be lost.')) { e.target.value = ''; return; }
+  document.getElementById('vehicle-name').value = vehicles[idx].name;
+  loadPartsFromData(vehicles[idx].parts);
+});
+
+refreshVehicleSelect();
+refreshAddTypeSelect();
+  renderLibrary();
+  document.getElementById('save-part-name').value = '';
+  document.getElementById('save-part-btn').textContent = '✓ Saved!';
+  setTimeout(() => document.getElementById('save-part-btn').textContent = 'Save Selection', 1500);
+};
+
+// Override add-btn to handle library inserts
+document.getElementById('add-btn').onclick = () => {
+  const val = document.getElementById('add-type').value;
+  if (val.startsWith('lib:')) {
+    const idx = parseInt(val.split(':')[1]);
+    const entry = partsLibrary[idx];
+    if (!entry) return;
+    pushUndo();
+    entry.parts.forEach(d => {
+      const p = createPart(d.type);
+      Object.assign(p, d);
+      p.id = nextId++;
+      parts.push(p);
+      buildMesh(p);
+    });
+    renderPartsList();
+    return;
+  }
+  pushUndo();
+  const type = val;
+  const part = createPart(type);
+  parts.push(part);
+  buildMesh(part);
+  selectPart(part.id);
+  renderPartsList();
+};
+
+// ── VEHICLE BUTTONS ──────────────────────────────────────────
+document.getElementById('veh-save-btn').onclick = () => {
+  const name = document.getElementById('vehicle-name').value.trim() || 'Unnamed';
+  const sel = document.getElementById('vehicle-select');
+  const idx = parseInt(sel.value);
+  if (!isNaN(idx) && vehicles[idx]) {
+    if (!confirm('Overwrite "' + vehicles[idx].name + '"?')) return;
+    vehicles[idx] = { name, parts: serializeParts() };
+  } else {
+    vehicles.push({ name, parts: serializeParts() });
+  }
+  saveVehicles();
+  refreshVehicleSelect();
+  document.getElementById('vehicle-select').value = vehicles.length - 1;
+};
+
+document.getElementById('veh-del-btn').onclick = () => {
+  const idx = parseInt(document.getElementById('vehicle-select').value);
+  if (isNaN(idx) || !vehicles[idx]) { alert('Select a saved vehicle to delete.'); return; }
+  if (!confirm('Delete "' + vehicles[idx].name + '"?')) return;
+  vehicles.splice(idx, 1);
+  saveVehicles();
+  refreshVehicleSelect();
+};
+
+document.getElementById('vehicle-select').addEventListener('change', e => {
+  const idx = parseInt(e.target.value);
+  if (isNaN(idx) || !vehicles[idx]) return;
+  if (parts.length && !confirm('Load "' + vehicles[idx].name + '"? Unsaved changes will be lost.')) { e.target.value = ''; return; }
+  document.getElementById('vehicle-name').value = vehicles[idx].name;
+  loadPartsFromData(vehicles[idx].parts);
+});
+
+refreshVehicleSelect();
+refreshAddTypeSelect();
+
+// ── LOAD vehicles.json on startup ────────────────────────────
+// Fetches vehicles.json from the same folder (requires local server).
+// Merges any vehicles not already in localStorage (matched by name).
+(async () => {
+  let imported = 0;
+  try {
+    const res = await fetch('vehicles.json');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+
+    data.forEach(v => {
+      if (!v.name) return;
+      const already = vehicles.find(existing => existing.name === v.name);
+      if (already) {
+        // Restore tuning sliders from _tuning if present in JSON
+        if (v.physics?._tuning) already.physics = { ...already.physics, ...v.physics._tuning };
+        if (v.description && !already.description) already.description = v.description;
+      } else {
+        // New vehicle — import it fully
+        vehicles.push({
+          name: v.name,
+          description: v.description || '',
+          physics: v.physics || {},
+          parts: v.parts || [],
+        });
+        imported++;
+      }
+    });
+
+    if (imported > 0 || data.length > 0) {
+      saveVehicles();
+      refreshVehicleSelect();
+      const msg = imported > 0
+        ? `Imported ${imported} new vehicle${imported > 1 ? 's' : ''} from vehicles.json`
+        : `vehicles.json loaded — ${data.length} vehicle${data.length > 1 ? 's' : ''} up to date`;
+      showToast(msg);
+    }
+  } catch(e) {
+    // No vehicles.json present — that's fine, just use localStorage
+  }
+})();
+
+function showToast(msg) {
+  let toast = document.getElementById('vb-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'vb-toast';
+    toast.style.cssText = [
+      'position:fixed', 'bottom:20px', 'left:50%', 'transform:translateX(-50%)',
+      'background:#1a3a1a', 'border:1px solid #2a6a2a', 'color:#4aaa4a',
+      'font-family:\'Courier New\',monospace', 'font-size:10px', 'letter-spacing:0.1em',
+      'padding:8px 16px', 'border-radius:4px', 'z-index:999',
+      'transition:opacity 0.4s', 'pointer-events:none'
+    ].join(';');
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+}
+
+// ── TABS ─────────────────────────────────────────────────────
+document.querySelectorAll('.panel-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'garage') renderGarage();
+  });
+});
+
+// ── GARAGE ────────────────────────────────────────────────────
+// Intuitive physics sliders — converted to raw Cannon values by physicsFromTuning()
+const PHYSICS_FIELDS = [
+  { key: 'mass',         label: 'Mass (kg)',     min: 50,  max: 600, step: 10,  def: 150, unit: 'kg',
+    hint: 'Heavier = more momentum, harder to stop and steer' },
+  { key: 'topSpeed',     label: 'Top Speed',     min: 5,   max: 25,  step: 0.5, def: 14,  unit: 'm/s',
+    hint: 'Maximum forward speed (~50 km/h default)' },
+  { key: 'acceleration', label: 'Acceleration',  min: 1,   max: 10,  step: 0.5, def: 5,   unit: '',
+    hint: 'How quickly the vehicle reaches top speed' },
+  { key: 'braking',      label: 'Braking',       min: 1,   max: 10,  step: 0.5, def: 5,   unit: '',
+    hint: 'How quickly the vehicle stops' },
+  { key: 'turning',      label: 'Turning',       min: 1,   max: 10,  step: 0.5, def: 5,   unit: '',
+    hint: 'Turning radius — higher = tighter turns' },
+];
+
+// Default tuning values for the base truck
+const DEFAULT_TUNING = { mass: 150, topSpeed: 14, acceleration: 5, braking: 5, turning: 5 };
+
+// Convert intuitive tuning values → raw Cannon physics config
+function physicsFromTuning(p) {
+  const mass         = p.mass         ?? DEFAULT_TUNING.mass;
+  const topSpeed     = p.topSpeed     ?? DEFAULT_TUNING.topSpeed;
+  const acceleration = p.acceleration ?? DEFAULT_TUNING.acceleration;
+  const braking      = p.braking      ?? DEFAULT_TUNING.braking;
+  const turning      = p.turning      ?? DEFAULT_TUNING.turning;
+
+  // Calibrated so defaults (accel=5, braking=5, turning=5) match the original base truck:
+  //   engineForce=1800, brakeForce=80, maxSteerAngle=0.52, steerSpeed=2.8
+  return {
+    mass,
+    topSpeed,
+    engineForce:          Math.round(acceleration * 360),     // accel 5 → 1800
+    brakeForce:           Math.round(braking * 16),           // braking 5 → 80
+    maxSteerAngle:        parseFloat((0.16 + turning * 0.072).toFixed(3)), // turning 5 → 0.52
+    steerSpeed:           parseFloat((1.0 + turning * 0.36).toFixed(2)),   // turning 5 → 2.8
+    steerReturn:          4.0,
+    suspensionStiffness:  35,
+    frictionSlip:         2.2,
+  };
+}
+
+function renderGarage() {
+  const list = document.getElementById('garage-list');
+  if (!vehicles.length) {
+    list.innerHTML = '<div id="garage-empty-state">No saved vehicles yet.<br>Build one, save it in the Vehicles panel,<br>then tune physics here.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  vehicles.forEach((v, idx) => {
+    if (!v.physics) v.physics = {};
+    // Derive wheels from parts if not already stored
+    if (!v.wheels) v.wheels = deriveWheelsFromParts(v.parts || []);
+
+    const card = document.createElement('div');
+    card.className = 'garage-card';
+    card.innerHTML = `
+      <div class="garage-card-header">
+        <span class="garage-card-name">${v.name}</span>
+        <span class="garage-card-chevron">▶</span>
+      </div>
+      <div class="garage-card-body">
+        <div class="phys-section-label">Description</div>
+        <input class="phys-desc-input" type="text" value="${v.description || ''}" placeholder="Short description for selection screen...">
+        <div class="phys-section-label">Physics</div>
+        ${PHYSICS_FIELDS.map(f => {
+          const val = v.physics[f.key] ?? f.def;
+          const disp = Number.isInteger(f.step) ? Math.round(val) : val.toFixed(f.step < 1 ? 1 : 0);
+          return `<div class="phys-row" title="${f.hint || ''}">
+            <label>${f.label}${f.unit ? ' <span style="color:#444;font-size:7px">${f.unit}</span>' : ''}</label>
+            <input type="range" min="${f.min}" max="${f.max}" step="${f.step}"
+              value="${val}" data-key="${f.key}" data-idx="${idx}">
+            <span class="pval">${disp}</span>
+          </div>`;
+        }).join('')}
+        <div class="phys-section-label" style="margin-top:10px">Wheels <span style="color:#555;font-size:8px;text-transform:none;letter-spacing:0">(from wheel_* parts)</span></div>
+        <div class="wheels-table"></div>
+        <div class="garage-btns">
+          <button class="garage-btn export" data-idx="${idx}">Copy to Game</button>
+          <button class="garage-btn del" data-idx="${idx}">Delete</button>
+        </div>
+      </div>`;
+
+    // Render wheels table
+    function renderWheelsTable() {
+      const tbl = card.querySelector('.wheels-table');
+      const ws = vehicles[idx].wheels || [];
+      if (!ws.length) {
+        tbl.innerHTML = '<div style="font-size:9px;color:#444;padding:4px 0">No wheel_* parts found. Name cylinders starting with wheel_ to define wheels.</div>';
+        return;
+      }
+      tbl.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin-bottom:4px">
+          <div style="font-size:8px;color:#555;letter-spacing:0.1em">NAME</div>
+          <div style="font-size:8px;color:#555;letter-spacing:0.1em">X</div>
+          <div style="font-size:8px;color:#555;letter-spacing:0.1em">Z</div>
+          <div style="font-size:8px;color:#555;letter-spacing:0.1em">STEER / DRIVE</div>
+        </div>
+        ${ws.map((w, wi) => `
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;align-items:center;margin-bottom:3px">
+            <div style="font-size:9px;color:#888;overflow:hidden;text-overflow:ellipsis">${w.name || 'wheel'}</div>
+            <div style="font-size:9px;color:#666">${(w.x||0).toFixed(2)}</div>
+            <div style="font-size:9px;color:#666">${(w.z||0).toFixed(2)}</div>
+            <div style="display:flex;gap:4px">
+              <label style="font-size:8px;color:#888;display:flex;align-items:center;gap:2px;cursor:pointer">
+                <input type="checkbox" data-wi="${wi}" data-role="steer" ${w.steer?'checked':''}> S
+              </label>
+              <label style="font-size:8px;color:#888;display:flex;align-items:center;gap:2px;cursor:pointer">
+                <input type="checkbox" data-wi="${wi}" data-role="drive" ${w.drive?'checked':''}> D
+              </label>
+            </div>
+          </div>`).join('')}
+        <div style="font-size:8px;color:#444;margin-top:4px">S = steers, D = drives</div>`;
+
+      tbl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', e => {
+          const wi = parseInt(e.target.dataset.wi);
+          const role = e.target.dataset.role;
+          vehicles[idx].wheels[wi][role] = e.target.checked;
+          saveVehicles();
+        });
+      });
+    }
+    renderWheelsTable();
+
+    // Toggle open/close
+    card.querySelector('.garage-card-header').onclick = () => {
+      card.classList.toggle('open');
+    };
+
+    // Live physics sliders
+    card.querySelectorAll('input[type=range]').forEach(sl => {
+      sl.addEventListener('input', e => {
+        const key = e.target.dataset.key;
+        const val = parseFloat(e.target.value);
+        const field = PHYSICS_FIELDS.find(f => f.key === key);
+        vehicles[idx].physics[key] = val;
+        const disp = Number.isInteger(field.step) ? Math.round(val) : val.toFixed(field.step < 1 ? 1 : 0);
+        e.target.nextElementSibling.textContent = disp;
+        saveVehicles();
+      });
+    });
+
+    // Description input
+    card.querySelector('.phys-desc-input').addEventListener('input', e => {
+      vehicles[idx].description = e.target.value;
+      saveVehicles();
+    });
+
+    // Export button
+    card.querySelector('.garage-btn.export').onclick = () => exportVehicleToGame(idx);
+
+    // Delete button
+    card.querySelector('.garage-btn.del').onclick = () => {
+      if (!confirm(`Delete "${v.name}"?`)) return;
+      vehicles.splice(idx, 1);
+      saveVehicles();
+      refreshVehicleSelect();
+      renderGarage();
+    };
+
+    list.appendChild(card);
+  });
+}
+
+function exportVehicleToGame(idx) {
+  const v = vehicles[idx];
+  if (!v) return;
+  const p = v.physics || {};
+  const savedParts = v.parts || [];
+  const wheels = v.wheels && v.wheels.length ? v.wheels : deriveWheelsFromParts(savedParts);
+
+  const lines = [];
+  lines.push(`  {`);
+  lines.push(`    name: '${v.name}',`);
+  lines.push(`    description: '${(v.description || 'Custom vehicle.').replace(/'/g, "\'")}',`);
+  lines.push(`    physics: {`);
+  PHYSICS_FIELDS.forEach(f => {
+    const val = p[f.key] ?? f.def;
+    lines.push(`      ${f.key}: ${val},`);
+  });
+  if (wheels.length) {
+    lines.push(`      wheels: [`);
+    wheels.forEach(w => {
+      lines.push(`        { x: ${ff(w.x)}, z: ${ff(w.z)}, steer: ${!!w.steer}, drive: ${!!w.drive} },`);
+    });
+    lines.push(`      ],`);
+  }
+  lines.push(`    },`);
+  lines.push(`    build(bodyGroup, scene, wheelGroups) {`);
+  lines.push(`      const body = bodyGroup;`);
+  lines.push(`      const box = (w,h,d,mat) => new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);`);
+  lines.push(`      const cyl = (rt,rb,h,s,mat) => new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,s), mat);`);
+
+  const usedMats = [...new Set(savedParts.map(p => p.mat))];
+  usedMats.forEach(m => lines.push(`      const m_${m} = matcapMat('${m}');`));
+  lines.push('');
+
+  savedParts.forEach(part => {
+    const mat = `m_${part.mat}`;
+    const pos = `(${ff(part.px)}, ${ff(part.py)}, ${ff(part.pz)})`;
+    if (part.type === 'box') {
+      lines.push(`      const ${part.name} = box(${ff(part.w)}, ${ff(part.h)}, ${ff(part.d)}, ${mat});`);
+      lines.push(`      ${part.name}.position.set${pos};`);
+      if (part.rx) lines.push(`      ${part.name}.rotation.x = ${ff(part.rx)};`);
+      if (part.ry) lines.push(`      ${part.name}.rotation.y = ${ff(part.ry)};`);
+      if (part.rz) lines.push(`      ${part.name}.rotation.z = ${ff(part.rz)};`);
+      lines.push(`      body.add(${part.name});`);
+    } else if (part.type === 'cylinder') {
+      lines.push(`      const ${part.name} = cyl(${ff(part.r)}, ${ff(part.r)}, ${ff(part.ch)}, 16, ${mat});`);
+      if (part.axis === 'x') lines.push(`      ${part.name}.rotation.z = Math.PI / 2;`);
+      if (part.axis === 'z') lines.push(`      ${part.name}.rotation.x = Math.PI / 2;`);
+      if (part.rx) lines.push(`      ${part.name}.rotation.x += ${ff(part.rx)};`);
+      if (part.ry) lines.push(`      ${part.name}.rotation.y += ${ff(part.ry)};`);
+      if (part.rz) lines.push(`      ${part.name}.rotation.z += ${ff(part.rz)};`);
+      lines.push(`      ${part.name}.position.set${pos};`);
+      lines.push(`      body.add(${part.name});`);
+    }
+  });
+
+  lines.push('');
+  lines.push(`      for (let i = 0; i < 4; i++) {`);
+  lines.push(`        const wg = new THREE.Group(); scene.add(wg);`);
+  lines.push(`        const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.34,18), matcapMat('rubber')); tire.rotation.z = Math.PI/2; wg.add(tire);`);
+  lines.push(`        const rim  = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,0.35,10), matcapMat('white')); rim.rotation.z = Math.PI/2; wg.add(rim);`);
+  lines.push(`        for (let s=0;s<5;s++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.36,0.06,0.06), matcapMat('dark')); sp.rotation.x=(s/5)*Math.PI*2; wg.add(sp); }`);
+  lines.push(`        wheelGroups.push(wg);`);
+  lines.push(`      }`);
+  lines.push(`    }`);
+  lines.push(`  },`);
+
+  const code = lines.join('\n');
+  document.getElementById('code-content').textContent = code;
+  document.getElementById('code-modal').classList.add('open');
+}
+
+function ff(n) { return parseFloat((n||0).toFixed(2)); }
+
+// Derive wheel definitions from parts named wheel_*
+// Sorted front-to-back (most negative Z first), paired left/right
+function deriveWheelsFromParts(partList) {
+  const wheelParts = (partList || []).filter(p =>
+    p.type === 'cylinder' && p.name && p.name.toLowerCase().startsWith('wheel_')
+  );
+  if (!wheelParts.length) return [];
+
+  // Sort by Z (front = most negative Z first)
+  wheelParts.sort((a, b) => (a.pz||0) - (b.pz||0));
+
+  // Group into axles by Z position (within 0.3 units = same axle)
+  const axles = [];
+  wheelParts.forEach(p => {
+    const existing = axles.find(ax => Math.abs(ax.z - (p.pz||0)) < 0.3);
+    if (existing) { existing.wheels.push(p); }
+    else { axles.push({ z: p.pz||0, wheels: [p] }); }
+  });
+
+  // First axle steers, last axle(s) drive
+  const result = [];
+  axles.forEach((ax, axIdx) => {
+    const steer = axIdx === 0;
+    const drive = axIdx === axles.length - 1;
+    ax.wheels.forEach(p => {
+      result.push({
+        name: p.name,
+        x: ff(p.px || 0),
+        z: ff(p.pz || 0),
+        steer,
+        drive,
+      });
+    });
+  });
+  return result;
+}
+
+// ── EXPORT vehicles.json ─────────────────────────────────────
+document.getElementById('export-json-btn').addEventListener('click', () => {
+  if (!vehicles.length) {
+    alert('No saved vehicles to export. Save a vehicle first using the Vehicles panel.');
+    return;
+  }
+
+  // Build export — parts + physics + metadata, no mesh refs
+  const exportData = vehicles.map(v => ({
+    name: v.name,
+    description: v.description || '',
+    physics: (() => {
+      const raw = physicsFromTuning(v.physics || {});
+      return {
+        // Raw values for game
+        mass:                raw.mass,
+        topSpeed:            raw.topSpeed,
+        engineForce:         raw.engineForce,
+        brakeForce:          raw.brakeForce,
+        maxSteerAngle:       raw.maxSteerAngle,
+        steerSpeed:          raw.steerSpeed,
+        steerReturn:         raw.steerReturn,
+        suspensionStiffness: raw.suspensionStiffness,
+        frictionSlip:        raw.frictionSlip,
+        // Preserve tuning values for round-tripping back into builder
+        _tuning: {
+          mass:         v.physics?.mass         ?? DEFAULT_TUNING.mass,
+          topSpeed:     v.physics?.topSpeed     ?? DEFAULT_TUNING.topSpeed,
+          acceleration: v.physics?.acceleration ?? DEFAULT_TUNING.acceleration,
+          braking:      v.physics?.braking      ?? DEFAULT_TUNING.braking,
+          turning:      v.physics?.turning      ?? DEFAULT_TUNING.turning,
+        },
+      };
+    })(),
+    wheels: v.wheels && v.wheels.length ? v.wheels : deriveWheelsFromParts(v.parts || []),
+    parts: (v.parts || []).map(p => {
+      const { mesh, ...rest } = p;
+      return rest;
+    }),
+  }));
+
+  const json = JSON.stringify(exportData, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'vehicles.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ── RENDER LOOP ───────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+
+// Init
+renderPartsList();
+renderInspector();
+</script>
+</body>
+</html>
