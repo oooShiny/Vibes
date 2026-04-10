@@ -68,26 +68,84 @@
 
   <div id="overlay">
     <h1>⚓ STRAIT RUN</h1>
+    <p style="color:#64748b;font-size:11px;margin:2px 0 6px;">A real-world oil tanker simulation</p>
+
     <div id="loadingStatus" style="color:#64748b;font-size:12px;margin:6px 0;">Fetching live data…</div>
-    <div id="liveDataBox" style="display:none;background:rgba(255,255,255,0.04);border-radius:8px;padding:9px 18px;margin:5px 0;max-width:420px;">
-      <div style="display:flex;gap:24px;justify-content:center;align-items:center;">
-        <div><div style="font-size:10px;color:#64748b;">STRAIT STATUS</div><div id="overlayStatus" style="font-size:14px;font-weight:bold;">—</div></div>
-        <div><div style="font-size:10px;color:#64748b;">BRENT CRUDE</div><div id="overlayOil" style="font-size:14px;font-weight:bold;color:#f59e0b;">—</div></div>
-        <div><div style="font-size:10px;color:#64748b;">CARGO VALUE</div><div id="overlayCargo" style="font-size:14px;font-weight:bold;color:#4ade80;">—</div></div>
+
+    <!-- Live data bar -->
+    <div id="liveDataBox" style="display:none;background:rgba(255,255,255,0.04);border-radius:8px;padding:9px 18px;margin:5px 0;max-width:420px;width:100%;">
+      <div style="display:flex;gap:0;justify-content:space-around;align-items:center;">
+        <div style="text-align:center;">
+          <div style="font-size:9px;color:#64748b;letter-spacing:0.08em;text-transform:uppercase;">Strait Status</div>
+          <div id="overlayStatus" style="font-size:14px;font-weight:bold;margin-top:2px;">—</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,0.08);height:30px;"></div>
+        <div style="text-align:center;">
+          <div style="font-size:9px;color:#64748b;letter-spacing:0.08em;text-transform:uppercase;">Brent Crude</div>
+          <div id="overlayOil" style="font-size:14px;font-weight:bold;color:#f59e0b;margin-top:2px;">—</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,0.08);height:30px;"></div>
+        <div style="text-align:center;">
+          <div style="font-size:9px;color:#64748b;letter-spacing:0.08em;text-transform:uppercase;">Cargo Value</div>
+          <div id="overlayCargo" style="font-size:14px;font-weight:bold;color:#4ade80;margin-top:2px;">—</div>
+        </div>
       </div>
     </div>
+
+    <!-- Leaderboard -->
     <div id="lbSection" style="display:none;max-width:420px;width:100%;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
         <span style="font-size:11px;color:#64748b;letter-spacing:1px;">🏆 LEADERBOARD</span>
-        <span style="font-size:10px;color:#475569;">shared across all captains</span>
+        <span style="font-size:10px;color:#475569;">global — all captains</span>
       </div>
       <div id="lbPanel"><div style="color:#475569;font-size:11px;padding:8px;">Loading scores…</div></div>
     </div>
-    <div id="missionDesc" style="display:none;max-width:420px;">
-      <p style="color:#94a3b8;font-size:12px;margin:5px 0;">Travel <strong style="color:white;">east</strong> to load oil, return <strong style="color:white;">west</strong> to deliver it.</p>
-      <div id="threatDesc" style="font-size:11px;color:#64748b;"></div>
+
+    <!-- Mission summary -->
+    <div id="missionDesc" style="display:none;max-width:420px;width:100%;">
+      <div style="background:rgba(255,255,255,0.03);border-radius:7px;padding:8px 12px;margin:5px 0;text-align:left;">
+        <div style="font-size:10px;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.07em;">Mission</div>
+        <p style="color:#cbd5e1;font-size:12px;margin:0;line-height:1.6;">
+          Sail <strong style="color:white;">east</strong> through the strait to load 2 million barrels of oil in the Gulf of Oman, then return <strong style="color:white;">west</strong> to deliver it. Your profit = oil price × barrels, minus any tolls or repairs.
+        </p>
+      </div>
+      <div id="threatDesc" style="font-size:11px;color:#64748b;padding:4px 2px;"></div>
     </div>
-    <p style="font-size:10px;color:#475569;margin-top:6px;">Arrow Keys / WASD — steer &amp; throttle</p>
+
+    <!-- Expandable explainer -->
+    <div id="explainerSection" style="display:none;max-width:420px;width:100%;margin-top:4px;">
+      <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.textContent=this.textContent.includes('▶')?'▼ Hide details':'▶ How does this work?'"
+        style="background:none;border:none;color:#475569;font-size:11px;font-family:'Courier New',monospace;cursor:pointer;padding:4px 0;width:100%;text-align:left;">
+        ▶ How does this work?
+      </button>
+      <div style="display:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:12px 14px;font-size:11px;color:#94a3b8;line-height:1.75;text-align:left;margin-top:4px;">
+
+        <div style="color:#e2e8f0;font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:0.05em;">LIVE DATA SOURCES</div>
+
+        <p style="margin:0 0 10px;">Every time the game loads, it fetches two real-world data points:</p>
+
+        <p style="margin:0 0 6px;"><span style="color:#38bdf8;">Strait status</span> — pulled from
+          <a href="https://hormuzstraitmonitor.com" target="_blank" style="color:#38bdf8;text-decoration:none;">hormuzstraitmonitor.com</a>,
+          a live dashboard tracking the current Hormuz shipping crisis. As of April 2026, the strait has been effectively closed to commercial traffic since February 28th following Iranian naval blockade operations. If the site reports the strait as open, the game runs in easy mode — patrol boats only, demanding small passage fees. If closed, the full arsenal activates: sea mines, kamikaze drones, mobile missile batteries, and $2M toll demands.</p>
+
+        <p style="margin:0 0 10px;"><span style="color:#f59e0b;">Brent crude oil price</span> — fetched from Yahoo Finance's public quote API. Brent is the global benchmark for oil traded out of the Middle East. With the strait closed, prices have surged well above $100/barrel — roughly 20% of the world's oil supply normally flows through this 24-mile chokepoint. Your 2-million-barrel cargo is worth whatever Brent is trading at the moment you load it.</p>
+
+        <div style="color:#e2e8f0;font-size:11px;font-weight:bold;margin:10px 0 6px;letter-spacing:0.05em;">GAMEPLAY MECHANICS</div>
+
+        <p style="margin:0 0 6px;"><span style="color:#4ade80;">Goal:</span> Maximize net profit across multiple runs. Cargo value is set when you reach the Gulf of Oman — but you still have to survive the return trip to collect it.</p>
+
+        <p style="margin:0 0 6px;"><span style="color:#fbbf24;">Threats (closed mode):</span> IRGC fast-attack boats that fire within 14 units · Dhow sailboats that deploy floating mines · Kamikaze drone boats with descending shadow warnings · Mobile anti-ship missiles fired from the Iranian coast with a 2-second warning ring.</p>
+
+        <p style="margin:0 0 6px;"><span style="color:#f59e0b;">Toll system:</span> Iranian authorities periodically demand passage fees — $250k in open mode, $2M when closed. Paying grants ~20 seconds of immunity. Refusing triggers an immediate escalation.</p>
+
+        <p style="margin:0;"><span style="color:#a78bfa;">Repairs:</span> After each successful delivery you can spend profit to repair hull damage at $800k per percentage point. A heavily damaged ship costs ~$20-30M to fully restore — often not worth it for a short next run.</p>
+
+        <div style="color:#e2e8f0;font-size:11px;font-weight:bold;margin:10px 0 6px;letter-spacing:0.05em;">THE REAL CONTEXT</div>
+        <p style="margin:0;color:#64748b;">The Strait of Hormuz is 24 miles wide at its narrowest, with two 2-mile shipping lanes. Iran controls the northern coastline and has positioned mobile missile batteries in the hills, making the waterway nearly impossible to defend conventionally. Nearly 2,000 vessels are currently stranded in the Persian Gulf. <a href="https://www.cnn.com/2026/03/26/middleeast/how-iran-controls-strait-of-hormuz-explained-intl-vis" target="_blank" style="color:#38bdf8;text-decoration:none;">Read the full CNN report →</a></p>
+      </div>
+    </div>
+
+    <p style="font-size:10px;color:#475569;margin-top:8px;">Arrow Keys / WASD to steer &amp; throttle</p>
     <div id="btnRow" style="display:none;justify-content:center;">
       <button class="gbtn green" id="startBtn">BEGIN TRANSIT</button>
     </div>
@@ -347,7 +405,7 @@ function spawnMissile(bx,bz){
   mg.position.set(bx,5,bz);
   mg.rotation.y=Math.atan2(tPos.x-bx,tPos.z-bz);mg.rotation.x=0.3;
   scene.add(mg);
-  missiles.push({g:mg,ring,tx:tPos.x,tz:tPos.z,bx,bz,life:1.0});
+  missiles.push({g:mg,ring,tx:tPos.x,tz:tPos.z,bx,bz,life:1.0,warning:2.0});
 }
 function spawnDrone(){
   const g=new THREE.Group();
@@ -625,7 +683,9 @@ function update(dt){
   }
   for(let i=missiles.length-1;i>=0;i--){
     const m=missiles[i],dx=m.tx-m.bx,dz=m.tz-m.bz;
-    m.life-=dt*1.6;const t2=1-m.life;
+    // Warning phase: ring pulses at launch site for 2s before missile moves
+    if(m.warning>0){m.warning-=dt;if(m.ring){m.ring.material.opacity=0.3+0.4*Math.sin(waveT*8);m.ring.rotation.z+=dt*3;}continue;}
+    m.life-=dt*0.50;const t2=1-m.life;
     m.g.position.x=m.bx+dx*t2;m.g.position.z=m.bz+dz*t2;m.g.position.y=8-t2*8+Math.sin(t2*Math.PI)*10;
     if(m.ring){m.ring.material.opacity=0.25+m.life*0.4+0.1*Math.sin(waveT*12);m.ring.rotation.z+=dt*2;}
     if(m.life<0.06){
@@ -694,6 +754,7 @@ async function boot(){
   document.getElementById('lbSection').style.display='block';
   document.getElementById('missionDesc').style.display='block';
   document.getElementById('btnRow').style.display='flex';
+  document.getElementById('explainerSection').style.display='block';
   hull=100;profit=0;runCount=0;speed=0;heading=0;invTimer=0;waveT=0;coastDmgTimer=0;
   tPos={x:-250,z:chanZ(-250)};
   droneTimer=7;fastBoatTimer=10;dhowTimer=14;missileTimer=20;tollTimer=30;
